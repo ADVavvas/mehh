@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5...3.21)
 project(mehh VERSION 0.1.0 LANGUAGES C CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -21,10 +23,14 @@ set (MEHH_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/tests)
 
 set (MEHH_SRC 
 ${MEHH_SRC_DIR}/main.cpp
+${MEHH_SRC_DIR}/chunk.cpp
+${MEHH_SRC_DIR}/debug.cpp
 )
 
 set (MEHH_TESTS 
 ${MEHH_TESTS_DIR}/test.cpp
+${MEHH_SRC_DIR}/chunk.cpp
+${MEHH_SRC_DIR}/debug.cpp
 )
 
 add_executable(mehh ${MEHH_SRC})
