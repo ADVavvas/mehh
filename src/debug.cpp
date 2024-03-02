@@ -19,10 +19,11 @@ size_t disassembleInstruction(Chunk &chunk, size_t offset) {
   if (offset >= chunk.count())
     return chunk.count() - 1;
 
-  if (offset > 0 && chunk.getLines()[offset] == chunk.getLines()[offset - 1]) {
+  uint8_t line = chunk.getLine(offset);
+  if (offset > 0 && line == chunk.getLine(offset - 1)) {
     std::cout << "    | ";
   } else {
-    std::cout << static_cast<int>(chunk.getLines()[offset]) << ' ';
+    std::cout << static_cast<int>(line) << ' ';
   }
 
   const OpCode &instruction{chunk.getCode()[offset]};
