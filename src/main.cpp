@@ -4,10 +4,10 @@
 
 int main() {
   Chunk chunk{};
-  chunk.write(OpCode::OP_RETURN);
   size_t constant = chunk.writeConstant(1.2);
-  chunk.write(OP_CONSTANT);
-  chunk.write(constant);
+  chunk.write(OP_CONSTANT, 123);
+  chunk.write(constant, 123);
+  chunk.write(OpCode::OP_RETURN, 123);
   disassembleChunk(chunk, "Test Chunk");
 
   return 0;

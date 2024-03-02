@@ -19,6 +19,12 @@ size_t disassembleInstruction(Chunk &chunk, size_t offset) {
   if (offset >= chunk.count())
     return chunk.count() - 1;
 
+  if (offset > 0 && chunk.getLines()[offset] == chunk.getLines()[offset - 1]) {
+    std::cout << "    | ";
+  } else {
+    std::cout << static_cast<int>(chunk.getLines()[offset]) << ' ';
+  }
+
   const OpCode &instruction{chunk.getCode()[offset]};
   switch (instruction) {
   case OP_RETURN:
