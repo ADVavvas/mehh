@@ -19,6 +19,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 set (MEHH_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+set (MEHH_INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set (MEHH_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/tests)
 
 set (MEHH_SRC 
@@ -38,8 +39,8 @@ ${MEHH_SRC_DIR}/value.cpp
 add_executable(mehh ${MEHH_SRC})
 add_executable(mehh_test ${MEHH_TESTS})
 
-target_include_directories(mehh PUBLIC ${MEHH_SRC_DIR})
-target_include_directories(mehh_test PUBLIC ${MEHH_SRC_DIR})
+target_include_directories(mehh PUBLIC ${MEHH_INC_DIR})
+target_include_directories(mehh_test PUBLIC ${MEHH_INC_DIR})
 
 target_link_libraries(
   mehh_test
