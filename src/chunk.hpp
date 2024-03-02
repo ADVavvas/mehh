@@ -1,17 +1,23 @@
 #pragma once
+#include "value.hpp"
 #include <cstdint>
 #include <vector>
 
 enum OpCode : uint8_t {
+  OP_CONSTANT,
   OP_RETURN,
 };
 
 class Chunk {
 public:
-  void write(OpCode opcode) noexcept;
-  [[nodiscard]] const std::vector<OpCode> &codes() const noexcept;
+  // TODO: What type? Implicitly converted from size_t?
+  void write(uint8_t byte) noexcept;
+  size_t writeConstant(Value &&value) noexcept;
+  [[nodiscard]] const std::vector<uint8_t> &getCode() const noexcept;
+  [[nodiscard]] const ValueArray &getConstants() const noexcept;
   [[nodiscard]] const size_t count() const noexcept;
 
 private:
-  std::vector<OpCode> code;
+  std::vector<uint8_t> code;
+  ValueArray constants;
 };
