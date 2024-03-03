@@ -43,7 +43,10 @@ size_t simpleInstruction(std::string_view name, size_t offset) {
 }
 size_t constantInstruction(std::string_view name, Chunk &chunk, size_t offset) {
   uint8_t constant = chunk.getCode()[offset + 1];
-  std::cout << name << " " << constant << '\''
-            << chunk.getConstants().getValues()[constant] << '\'' << "\n";
+  std::cout << name << " " << constant << '\'';
+  printValue(chunk.getConstants().getValues()[constant]);
+  std::cout << '\'' << "\n";
   return offset + 2;
 }
+
+void printValue(const Value &value) { std::cout << value; }

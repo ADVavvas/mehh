@@ -27,6 +27,7 @@ ${MEHH_SRC_DIR}/main.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
 ${MEHH_SRC_DIR}/debug.cpp
 ${MEHH_SRC_DIR}/value.cpp
+${MEHH_SRC_DIR}/vm.cpp
 )
 
 set (MEHH_TESTS 
@@ -34,6 +35,7 @@ ${MEHH_TESTS_DIR}/test.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
 ${MEHH_SRC_DIR}/debug.cpp
 ${MEHH_SRC_DIR}/value.cpp
+${MEHH_SRC_DIR}/vm.cpp
 )
 
 add_executable(mehh ${MEHH_SRC})
