@@ -5,7 +5,7 @@
 #include <iomanip>
 #include <iostream>
 
-void disassembleChunk(Chunk &chunk, std::string_view name) {
+void disassembleChunk(const Chunk &chunk, const std::string_view name) {
   std::cout << std::format("== {} ==\n", name);
 
   for (size_t offset = 0; offset < chunk.count();) {
@@ -13,7 +13,7 @@ void disassembleChunk(Chunk &chunk, std::string_view name) {
   }
 }
 
-size_t disassembleInstruction(Chunk &chunk, size_t offset) {
+size_t disassembleInstruction(const Chunk &chunk, size_t offset) {
   std::cout << std::setfill('0') << std::right << std::setw(4) << offset << ' ';
 
   if (offset >= chunk.count())
@@ -37,11 +37,12 @@ size_t disassembleInstruction(Chunk &chunk, size_t offset) {
   }
 }
 
-size_t simpleInstruction(std::string_view name, size_t offset) {
+size_t simpleInstruction(const std::string_view name, size_t offset) {
   std::cout << name << "\n";
   return offset + 1;
 }
-size_t constantInstruction(std::string_view name, Chunk &chunk, size_t offset) {
+size_t constantInstruction(const std::string_view name, const Chunk &chunk,
+                           size_t offset) {
   uint8_t constant = chunk.getCode()[offset + 1];
   std::cout << name << " " << constant << '\'';
   printValue(chunk.getConstants().getValues()[constant]);

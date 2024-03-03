@@ -1,5 +1,6 @@
 #include "vm.hpp"
 #include "chunk.hpp"
+#include "common.hpp"
 #include "debug.hpp"
 #include <iostream>
 
@@ -17,6 +18,9 @@ const InterpretResult VM::interpret(const Chunk &chunk) {
 
 const InterpretResult VM::run() {
   for (;;) {
+#ifdef DEBUG_TRACE_EXECUTION
+    disassembleInstruction(*chunk, ip - chunk->getCode().begin());
+#endif
     uint8_t instruction;
     switch (instruction = readByte()) {
     case OP_RETURN:
