@@ -51,16 +51,16 @@ const InterpretResult VM::run() {
       stack.push_back(-val);
     } break;
     case OP_ADD:
-      binary_op([](Value a, Value b) { return a + b; });
+      binary_op([](Value a, Value b) constexpr { return a + b; });
       break;
     case OP_SUBTRACT:
-      binary_op([](Value a, Value b) { return a - b; });
+      binary_op([](Value a, Value b) constexpr { return a - b; });
       break;
     case OP_MULTIPLY:
-      binary_op([](Value a, Value b) { return a * b; });
+      binary_op([](Value a, Value b) constexpr { return a * b; });
       break;
     case OP_DIVIDE:
-      binary_op([](Value a, Value b) { return a / b; });
+      binary_op([](Value a, Value b) constexpr { return a / b; });
       break;
     }
   }
