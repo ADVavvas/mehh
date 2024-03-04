@@ -2,7 +2,11 @@
 #include "chunk.hpp"
 #include "common.hpp"
 #include "debug.hpp"
+#include "value.hpp"
+#include <codecvt>
 #include <iostream>
+
+VM::VM() noexcept { stack.reserve(STACK_MAX); }
 
 inline const uint8_t VM::readByte() { return *ip++; }
 
@@ -19,17 +23,46 @@ const InterpretResult VM::interpret(const Chunk &chunk) {
 const InterpretResult VM::run() {
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
+    std::cout << "          ";
+    for (auto val : stack) {
+      std::cout << "[ ";
+      printValue(val);
+      std::cout << " ]";
+    }
+    std::cout << "\n";
     disassembleInstruction(*chunk, ip - chunk->getCode().begin());
 #endif
     uint8_t instruction;
     switch (instruction = readByte()) {
     case OP_RETURN:
+      printValue(stack.back());
+      std::cout << "\n";
+      stack.pop_back();
       return INTERPRET_OK;
-    case OP_CONSTANT:
+    case OP_CONSTANT: {
       const Value &constant = readConstant();
+      stack.push_back(constant);
       printValue(constant);
       std::cout << "\n";
+    } break;
+    case OP_NEGATE: {
+      Value val = stack.back();
+      stack.pop_back();
+      stack.push_back(-val);
+    } break;
+    case OP_ADD:
+      binary_op([](Value a, Value b) { return a + b; });
+      break;
+    case OP_SUBTRACT:
+      binary_op([](Value a, Value b) { return a - b; });
+      break;
+    case OP_MULTIPLY:
+      binary_op([](Value a, Value b) { return a * b; });
+      break;
+    case OP_DIVIDE:
+      binary_op([](Value a, Value b) { return a / b; });
       break;
     }
   }
+  return INTERPRET_COMPILE_ERROR;
 };
