@@ -3,6 +3,25 @@
 #include "vm.hpp"
 #include <iostream>
 
+#include "Tracy.hpp"
+
+constexpr int RUNS = 1'000'000;
+
+void profileNegation() {
+  ZoneScoped;
+  VM vm{};
+  Chunk chunk{};
+  size_t constant = chunk.writeConstant(0.001);
+  chunk.write(OP_CONSTANT, 1);
+  chunk.write(constant, 1);
+  for (int i = 0; i < RUNS; ++i) {
+    chunk.write(OP_NEGATE, 1);
+  }
+
+  chunk.write(OP_RETURN, 2);
+  InterpretResult result = vm.interpret(chunk);
+}
+
 int main() {
   VM vm{};
   Chunk chunk{};

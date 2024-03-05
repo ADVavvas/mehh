@@ -36,19 +36,18 @@ const InterpretResult VM::run() {
     switch (instruction = readByte()) {
     case OP_RETURN:
       printValue(stack.back());
-      std::cout << "\n";
+      // std::cout << "\n";
       stack.pop_back();
       return INTERPRET_OK;
     case OP_CONSTANT: {
       const Value &constant = readConstant();
       stack.push_back(constant);
-      printValue(constant);
-      std::cout << "\n";
+      // printValue(constant);
+      // std::cout << "\n";
     } break;
     case OP_NEGATE: {
-      Value val = stack.back();
-      stack.pop_back();
-      stack.push_back(-val);
+      Value &val = stack.back();
+      val = -val;
     } break;
     case OP_ADD:
       binary_op([](Value a, Value b) constexpr { return a + b; });

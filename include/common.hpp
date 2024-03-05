@@ -1,3 +1,4 @@
 #pragma once
 
 #define DEBUG_TRACE_EXECUTION
+#undef DEBUG_TRACE_EXECUTION
