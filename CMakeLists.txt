@@ -34,9 +34,12 @@ set (MEHH_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/tests)
 
 set (MEHH_SRC 
 ${TRACY_SRC_DIR}/TracyClient.cpp
-${MEHH_SRC_DIR}/main.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
+${MEHH_SRC_DIR}/compiler.cpp
 ${MEHH_SRC_DIR}/debug.cpp
+${MEHH_SRC_DIR}/main.cpp
+${MEHH_SRC_DIR}/mehh.cpp
+${MEHH_SRC_DIR}/scanner.cpp
 ${MEHH_SRC_DIR}/value.cpp
 ${MEHH_SRC_DIR}/vm.cpp
 )
@@ -44,7 +47,11 @@ ${MEHH_SRC_DIR}/vm.cpp
 set (MEHH_TESTS 
 ${MEHH_TESTS_DIR}/test.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
+${MEHH_SRC_DIR}/compiler.cpp
 ${MEHH_SRC_DIR}/debug.cpp
+${MEHH_SRC_DIR}/main.cpp
+${MEHH_SRC_DIR}/mehh.cpp
+${MEHH_SRC_DIR}/scanner.cpp
 ${MEHH_SRC_DIR}/value.cpp
 ${MEHH_SRC_DIR}/vm.cpp
 )

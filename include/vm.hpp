@@ -1,6 +1,8 @@
 #pragma once
 #include "chunk.hpp"
+#include "compiler.hpp"
 #include <cstdint>
+#include <string_view>
 
 #define STACK_MAX 256
 
@@ -13,10 +15,11 @@ enum InterpretResult {
 class VM {
 public:
   VM() noexcept;
-  [[nodiscard]] const InterpretResult interpret(const Chunk &chunk);
+  [[nodiscard]] const InterpretResult interpret(const std::string_view source);
   const InterpretResult run();
 
 private:
+  const Compiler compiler;
   const Chunk *chunk;
   std::vector<uint8_t>::const_iterator ip;
   std::vector<Value> stack;

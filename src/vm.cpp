@@ -5,6 +5,7 @@
 #include "value.hpp"
 #include <codecvt>
 #include <iostream>
+#include <string_view>
 
 VM::VM() noexcept { stack.reserve(STACK_MAX); }
 
@@ -14,10 +15,12 @@ inline const Value VM::readConstant() {
   return chunk->getConstants().getValues()[readByte()];
 }
 
-const InterpretResult VM::interpret(const Chunk &chunk) {
-  this->chunk = &chunk;
-  ip = chunk.getCode().begin();
-  return run();
+const InterpretResult VM::interpret(const std::string_view source) {
+  compiler.compile(source);
+  return INTERPRET_OK;
+  // this->chunk = &chunk;
+  // ip = chunk.getCode().begin();
+  // return run();
 }
 
 const InterpretResult VM::run() {
