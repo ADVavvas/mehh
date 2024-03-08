@@ -22,7 +22,7 @@ class Chunk {
 public:
   // TODO: What type? Implicitly converted from size_t?
   void write(uint8_t byte, size_t line) noexcept;
-  size_t writeConstant(Value &&value) noexcept;
+  size_t writeConstant(const Value &value) noexcept;
   [[nodiscard]] const std::vector<uint8_t> &getCode() const noexcept;
   [[nodiscard]] const uint8_t getLine(size_t offset) const noexcept;
   [[nodiscard]] const std::vector<Line> &getLines() const noexcept;

@@ -2,9 +2,12 @@
 #include "token.hpp"
 #include <cctype>
 
-Scanner::Scanner(const std::string_view source) noexcept
-    : source{source}, start{0}, current{0}, line{1} {}
-
+void Scanner::init(const std::string_view source) noexcept {
+  this->source = source;
+  start = 0;
+  current = 0;
+  line = 1;
+}
 const Token Scanner::scanToken() noexcept {
   skipWhitespace();
   start = current;

@@ -5,13 +5,15 @@
 class Scanner {
 
 public:
-  explicit Scanner(const std::string_view source) noexcept;
+  void init(const std::string_view source) noexcept;
   [[nodiscard]] const Token scanToken() noexcept;
 
 private:
   size_t start;
   size_t current;
   size_t line;
+  std::string_view source;
+
   [[nodiscard]] const Token makeToken(TokenType) const noexcept;
   [[nodiscard]] const Token
   errorToken(const std::string_view message) const noexcept;
@@ -28,5 +30,4 @@ private:
                                              const TokenType type);
   const char advance() noexcept;
   void skipWhitespace() noexcept;
-  std::string_view source;
 };

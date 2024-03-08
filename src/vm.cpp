@@ -16,11 +16,10 @@ inline const Value VM::readConstant() {
 }
 
 const InterpretResult VM::interpret(const std::string_view source) {
-  compiler.compile(source);
-  return INTERPRET_OK;
-  // this->chunk = &chunk;
-  // ip = chunk.getCode().begin();
-  // return run();
+  const Chunk chunk = compiler.compile(source);
+  this->chunk = &chunk;
+  ip = this->chunk->getCode().begin();
+  return run();
 }
 
 const InterpretResult VM::run() {

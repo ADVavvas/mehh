@@ -16,7 +16,7 @@ void Chunk::write(uint8_t byte, size_t line) noexcept {
   }
 }
 
-size_t Chunk::writeConstant(Value &&value) noexcept {
+size_t Chunk::writeConstant(const Value &value) noexcept {
   return constants.write(value);
 }
 
