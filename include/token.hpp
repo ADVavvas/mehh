@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string_view>
 
-enum TokenType {
+enum class TokenType {
   // Single-character tokens.
   LEFT_PAREN,
   RIGHT_PAREN,

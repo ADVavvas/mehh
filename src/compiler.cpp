@@ -104,7 +104,9 @@ void Compiler::emitConstant(const Value &value) noexcept {
   emitBytes(OpCode::OP_CONSTANT, makeConstant(value));
 }
 
-void Compiler::parsePrecedence(const Precedence precedence) noexcept {};
+void Compiler::parsePrecedence(const Precedence precedence) noexcept {
+  advance();
+};
 
 void Compiler::expression() noexcept {
   parsePrecedence(Precedence::ASSIGNMENT);
@@ -133,4 +135,33 @@ void Compiler::unary() noexcept {
     // Should be unreachable.
     return;
   }
+}
+
+void Compiler::binary() noexcept {
+  TokenType operatorType = parser.previous.type;
+
+  const ParseRule rule = getRule(operatorType);
+  parsePrecedence(rule.nextPrecedence());
+
+  switch (operatorType) {
+  case TokenType::PLUS:
+    emitByte(OpCode::OP_ADD);
+    break;
+  case TokenType::MINUS:
+    emitByte(OpCode::OP_SUBTRACT);
+    break;
+  case TokenType::STAR:
+    emitByte(OpCode::OP_MULTIPLY);
+    break;
+  case TokenType::SLASH:
+    emitByte(OpCode::OP_DIVIDE);
+    break;
+  default:
+    // Should be unreachable.
+    return;
+  }
+}
+
+const ParseRule Compiler::getRule(const TokenType type) const {
+  return rules[static_cast<std::underlying_type<TokenType>::type>(type)];
 }

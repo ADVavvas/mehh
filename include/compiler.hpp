@@ -6,6 +6,22 @@
 #include "token.hpp"
 #include <optional>
 #include <string_view>
+#include <type_traits>
+
+class Compiler;
+
+using ParseFn = void (Compiler::*)();
+class ParseRule {
+public:
+  ParseFn prefix;
+  ParseFn infix;
+  Precedence precedence;
+  const Precedence nextPrecedence() const {
+    return static_cast<Precedence>(
+        (static_cast<int>(precedence) + 1) %
+        static_cast<int>(Precedence::NUM_PRECEDENCES));
+  }
+};
 
 class Compiler {
 public:
@@ -34,4 +50,50 @@ private:
   void number() noexcept;
   void grouping() noexcept;
   void unary() noexcept;
+  void binary() noexcept;
+  const ParseRule getRule(const TokenType type) const;
+
+public:
+  constexpr static ParseRule rules[40] = {
+      {&Compiler::grouping, nullptr, Precedence::NONE},        // LEFT_PAREN
+      {nullptr, nullptr, Precedence::NONE},                    // RIGHT_PAREN
+      {nullptr, nullptr, Precedence::NONE},                    // LEFT_BRACE
+      {nullptr, nullptr, Precedence::NONE},                    // RIGHT_BRACE
+      {nullptr, nullptr, Precedence::NONE},                    // COMMA
+      {nullptr, nullptr, Precedence::NONE},                    // DOT
+      {&Compiler::unary, &Compiler::binary, Precedence::TERM}, // MINUS
+      {nullptr, &Compiler::binary, Precedence::TERM},          // PLUS
+      {nullptr, nullptr, Precedence::NONE},                    // SEMICOLON
+      {nullptr, &Compiler::binary, Precedence::FACTOR},        // SLASH
+      {nullptr, &Compiler::binary, Precedence::FACTOR},        // STAR
+      {nullptr, nullptr, Precedence::NONE},                    // BANG
+      {nullptr, nullptr, Precedence::NONE},                    // BANG_EQUAL
+      {nullptr, nullptr, Precedence::NONE},                    // EQUAL
+      {nullptr, nullptr, Precedence::NONE},                    // EQUAL_EQUAL
+      {nullptr, nullptr, Precedence::NONE},                    // GREATER
+      {nullptr, nullptr, Precedence::NONE},                    // GREATER_EQUAL
+      {nullptr, nullptr, Precedence::NONE},                    // LESS
+      {nullptr, nullptr, Precedence::NONE},                    // LESS_EQUAL
+      {nullptr, nullptr, Precedence::NONE},                    // IDENTIFIER
+      {nullptr, nullptr, Precedence::NONE},                    // STRING
+      {&Compiler::number, nullptr, Precedence::NONE},          // NUMBER
+      {nullptr, nullptr, Precedence::NONE},                    // AND
+      {nullptr, nullptr, Precedence::NONE},                    // CLASS
+      {nullptr, nullptr, Precedence::NONE},                    // ELSE
+      {nullptr, nullptr, Precedence::NONE},                    // FALSE
+      {nullptr, nullptr, Precedence::NONE},                    // FOR
+      {nullptr, nullptr, Precedence::NONE},                    // FUN
+      {nullptr, nullptr, Precedence::NONE},                    // IF
+      {nullptr, nullptr, Precedence::NONE},                    // NIL
+      {nullptr, nullptr, Precedence::NONE},                    // OR
+      {nullptr, nullptr, Precedence::NONE},                    // PRINT
+      {nullptr, nullptr, Precedence::NONE},                    // RETURN
+      {nullptr, nullptr, Precedence::NONE},                    // SUPER
+      {nullptr, nullptr, Precedence::NONE},                    // THIS
+      {nullptr, nullptr, Precedence::NONE},                    // TRUE
+      {nullptr, nullptr, Precedence::NONE},                    // VAR
+      {nullptr, nullptr, Precedence::NONE},                    // WHILE
+      {nullptr, nullptr, Precedence::NONE},                    // ERROR
+      {nullptr, nullptr, Precedence::NONE},                    // EOF
+  };
 };

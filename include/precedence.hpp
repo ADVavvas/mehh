@@ -1,6 +1,6 @@
 #pragma once
 
-enum Precedence {
+enum class Precedence {
   NONE,
   ASSIGNMENT, // =
   OR,         // or
@@ -11,5 +11,6 @@ enum Precedence {
   FACTOR,     // * /
   UNARY,      // ! -
   CALL,       // . ()
-  PRIMARY
+  PRIMARY,
+  NUM_PRECEDENCES
 };
