@@ -60,4 +60,4 @@ size_t constantInstruction(const std::string_view name, const Chunk &chunk,
   return offset + 2;
 }
 
-void printValue(const Value &value) { std::cout << value; }
+void printValue(const Value &value) { std::cout << value << '\n'; }

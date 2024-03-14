@@ -185,7 +185,7 @@ const char Scanner::peekNext() noexcept {
 
 const char Scanner::advance() noexcept { return source[current++]; }
 
-const bool Scanner::isAtEnd() noexcept { return current != source.size(); }
+const bool Scanner::isAtEnd() noexcept { return current == source.size(); }
 
 void Scanner::skipWhitespace() noexcept {
   while (1) {

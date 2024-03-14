@@ -6,10 +6,10 @@
 void Mehh::repl() noexcept {
   std::string line;
 
-  std::cout << "\n";
+  std::cout << "\n> ";
   while (getline(std::cin, line)) {
-    std::cout << "> ";
     vm.interpret(line);
+    std::cout << "\n> ";
   }
 }
 

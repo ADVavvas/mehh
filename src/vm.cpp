@@ -3,7 +3,6 @@
 #include "common.hpp"
 #include "debug.hpp"
 #include "value.hpp"
-#include <codecvt>
 #include <iostream>
 #include <string_view>
 
@@ -16,8 +15,10 @@ inline const Value VM::readConstant() {
 }
 
 const InterpretResult VM::interpret(const std::string_view source) {
-  const Chunk chunk = compiler.compile(source);
-  this->chunk = &chunk;
+  const std::optional<Chunk> &chunk = compiler.compile(source);
+  if (!chunk.has_value())
+    return INTERPRET_COMPILE_ERROR;
+  this->chunk = &chunk.value();
   ip = this->chunk->getCode().begin();
   return run();
 }

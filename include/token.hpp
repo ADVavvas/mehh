@@ -53,6 +53,7 @@ enum class TokenType {
 
 class Token {
 public:
+  constexpr Token() : type{TokenType::END_OF_FILE}, lexeme{}, line{0} {};
   explicit constexpr Token(TokenType type, std::string_view lexeme,
                            size_t line) noexcept
       : type{type}, lexeme{lexeme}, line{line} {};

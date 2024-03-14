@@ -19,8 +19,8 @@ public:
   const InterpretResult run();
 
 private:
-  const Compiler compiler;
   const Chunk *chunk;
+  Compiler compiler;
   std::vector<uint8_t>::const_iterator ip;
   std::vector<Value> stack;
 

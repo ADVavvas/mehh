@@ -1,5 +1,6 @@
 #include "compiler.hpp"
 #include "chunk.hpp"
+#include "common.hpp"
 #include "precedence.hpp"
 #include "token.hpp"
 #include <cstdint>
@@ -7,6 +8,9 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#ifdef DEBUG_PRINT_CODE
+#include "debug.hpp"
+#endif
 
 const std::optional<Chunk>
 Compiler::compile(const std::string_view source) noexcept {
@@ -20,12 +24,11 @@ Compiler::compile(const std::string_view source) noexcept {
   advance();
   expression();
   consume(TokenType::END_OF_FILE, "Expect end of expression");
-  Chunk c;
   endCompiler();
   if (!parser.hadError) {
-    return std::make_optional(c);
+    return std::make_optional(chunk);
   }
-  return std::nullopt_t;
+  return std::nullopt;
 }
 
 Chunk &Compiler::currentChunk() const noexcept { return *compilingChunk; }
@@ -33,7 +36,7 @@ Chunk &Compiler::currentChunk() const noexcept { return *compilingChunk; }
 void Compiler::advance() noexcept {
   parser.previous = parser.current;
   while (1) {
-    parser.current = scanToken();
+    parser.current = scanner.scanToken();
     if (parser.current.type != TokenType::ERROR) {
       break;
     }
@@ -59,7 +62,7 @@ void Compiler::errorAt(const Token &token,
   parser.panicMode = true;
   std::cout << "[line " << token.line << "] Error";
   if (token.type == TokenType::END_OF_FILE) {
-    std::cout << "at end";
+    std::cout << " at end";
   } else if (token.type == TokenType::ERROR) {
     // nothing
   } else {
@@ -78,7 +81,14 @@ void Compiler::error(const std::string_view message) noexcept {
   errorAt(parser.previous, message);
 }
 
-void Compiler::endCompiler() noexcept { emitReturn(); }
+void Compiler::endCompiler() noexcept {
+  emitReturn();
+#ifdef DEBUG_PRINT_CODE
+  if (!parser.hadError) {
+    disassembleChunk(currentChunk(), "code");
+  }
+#endif
+}
 
 uint8_t Compiler::makeConstant(const Value &value) noexcept {
   size_t constant = currentChunk().writeConstant(value);
@@ -106,6 +116,19 @@ void Compiler::emitConstant(const Value &value) noexcept {
 
 void Compiler::parsePrecedence(const Precedence precedence) noexcept {
   advance();
+  const ParseFn prefixRule = getRule(parser.previous.type).prefix;
+  if (prefixRule == nullptr) {
+    error("Expect expression");
+    return;
+  }
+
+  (*this.*prefixRule)();
+
+  while (precedence <= getRule(parser.current.type).precedence) {
+    advance();
+    const ParseFn infixRule = getRule(parser.previous.type).infix;
+    (*this.*infixRule)();
+  }
 };
 
 void Compiler::expression() noexcept {

@@ -6,7 +6,6 @@
 #include "token.hpp"
 #include <optional>
 #include <string_view>
-#include <type_traits>
 
 class Compiler;
 
