@@ -5,6 +5,7 @@
 #include "value.hpp"
 #include <iostream>
 #include <string_view>
+#include <variant>
 
 VM::VM() noexcept { stack.reserve(STACK_MAX); }
 
@@ -39,7 +40,7 @@ const InterpretResult VM::run() {
     switch (instruction = readByte()) {
     case OP_RETURN:
       printValue(stack.back());
-      // std::cout << "\n";
+      std::cout << "\n";
       stack.pop_back();
       return INTERPRET_OK;
     case OP_CONSTANT: {
@@ -50,7 +51,11 @@ const InterpretResult VM::run() {
     } break;
     case OP_NEGATE: {
       Value &val = stack.back();
-      val = -val;
+      if (!std::holds_alternative<double>(val)) {
+        runtimeError("Operand must be a number");
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      val = -std::get<double>(val);
     } break;
     case OP_ADD:
       binary_op([](Value a, Value b) constexpr { return a + b; });

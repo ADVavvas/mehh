@@ -1,8 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <variant>
 #include <vector>
-using Value = double;
+
+using nil = std::monostate;
+using Value = std::variant<double, bool, nil>;
 
 class ValueArray {
 public:
@@ -14,3 +17,5 @@ private:
   uint32_t capacity;
   std::vector<Value> values;
 };
+
+void printValue(const Value &value);

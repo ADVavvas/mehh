@@ -1,4 +1,5 @@
 #include "value.hpp"
+#include <iostream>
 
 size_t ValueArray::write(Value value) noexcept {
   values.push_back(value);
@@ -12,3 +13,5 @@ size_t ValueArray::write(Value value) noexcept {
 [[nodiscard]] const size_t ValueArray::count() const noexcept {
   return values.size();
 }
+
+void printValue(const Value &value) { std::cout << value; }

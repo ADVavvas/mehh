@@ -11,5 +11,3 @@ void disassembleChunk(const Chunk &chunk, std::string_view name);
 
 [[nodiscard]] size_t constantInstruction(const std::string_view name,
                                          const Chunk &chunk, size_t offset);
-
-void printValue(const Value &value);

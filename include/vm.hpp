@@ -2,6 +2,8 @@
 #include "chunk.hpp"
 #include "compiler.hpp"
 #include <cstdint>
+#include <format>
+#include <iostream>
 #include <string_view>
 
 #define STACK_MAX 256
@@ -26,6 +28,15 @@ private:
 
   [[nodiscard]] inline const uint8_t readByte();
   [[nodiscard]] inline const Value readConstant();
+  template <typename... Args>
+  void runtimeError(const std::string_view format, Args &&...args) {
+
+    std::cout << std::vformat(format, std::make_format_args(args...)) << '\n';
+
+    size_t instruction = ip - chunk->getCode().begin() - 1;
+    size_t line = chunk->getLine(instruction);
+    std::cout << std::format("[line {}] in script\n", line);
+  }
 
   template <typename BinaryOperation> void binary_op(BinaryOperation &&op) {
     Value b = stack.back();
