@@ -50,6 +50,7 @@ private:
   void grouping() noexcept;
   void unary() noexcept;
   void binary() noexcept;
+  void literal() noexcept;
   const ParseRule getRule(const TokenType type) const;
 
 public:
@@ -65,31 +66,31 @@ public:
       {nullptr, nullptr, Precedence::NONE},                    // SEMICOLON
       {nullptr, &Compiler::binary, Precedence::FACTOR},        // SLASH
       {nullptr, &Compiler::binary, Precedence::FACTOR},        // STAR
-      {nullptr, nullptr, Precedence::NONE},                    // BANG
-      {nullptr, nullptr, Precedence::NONE},                    // BANG_EQUAL
+      {&Compiler::unary, nullptr, Precedence::NONE},           // BANG
+      {nullptr, &Compiler::binary, Precedence::EQUALITY},      // BANG_EQUAL
       {nullptr, nullptr, Precedence::NONE},                    // EQUAL
-      {nullptr, nullptr, Precedence::NONE},                    // EQUAL_EQUAL
-      {nullptr, nullptr, Precedence::NONE},                    // GREATER
-      {nullptr, nullptr, Precedence::NONE},                    // GREATER_EQUAL
-      {nullptr, nullptr, Precedence::NONE},                    // LESS
-      {nullptr, nullptr, Precedence::NONE},                    // LESS_EQUAL
+      {nullptr, &Compiler::binary, Precedence::EQUALITY},      // EQUAL_EQUAL
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // GREATER
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // GREATER_EQUAL
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS_EQUAL
       {nullptr, nullptr, Precedence::NONE},                    // IDENTIFIER
       {nullptr, nullptr, Precedence::NONE},                    // STRING
       {&Compiler::number, nullptr, Precedence::NONE},          // NUMBER
       {nullptr, nullptr, Precedence::NONE},                    // AND
       {nullptr, nullptr, Precedence::NONE},                    // CLASS
       {nullptr, nullptr, Precedence::NONE},                    // ELSE
-      {nullptr, nullptr, Precedence::NONE},                    // FALSE
+      {&Compiler::literal, nullptr, Precedence::NONE},         // FALSE
       {nullptr, nullptr, Precedence::NONE},                    // FOR
       {nullptr, nullptr, Precedence::NONE},                    // FUN
       {nullptr, nullptr, Precedence::NONE},                    // IF
-      {nullptr, nullptr, Precedence::NONE},                    // NIL
+      {&Compiler::literal, nullptr, Precedence::NONE},         // NIL
       {nullptr, nullptr, Precedence::NONE},                    // OR
       {nullptr, nullptr, Precedence::NONE},                    // PRINT
       {nullptr, nullptr, Precedence::NONE},                    // RETURN
       {nullptr, nullptr, Precedence::NONE},                    // SUPER
       {nullptr, nullptr, Precedence::NONE},                    // THIS
-      {nullptr, nullptr, Precedence::NONE},                    // TRUE
+      {&Compiler::literal, nullptr, Precedence::NONE},         // TRUE
       {nullptr, nullptr, Precedence::NONE},                    // VAR
       {nullptr, nullptr, Precedence::NONE},                    // WHILE
       {nullptr, nullptr, Precedence::NONE},                    // ERROR

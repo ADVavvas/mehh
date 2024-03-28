@@ -7,6 +7,11 @@
 using nil = std::monostate;
 using Value = std::variant<double, bool, nil>;
 
+template <typename... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
 class ValueArray {
 public:
   size_t write(Value value) noexcept;

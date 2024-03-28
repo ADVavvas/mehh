@@ -68,8 +68,9 @@ const bool Scanner::match(const char expected) noexcept {
   if (isAtEnd()) {
     return false;
   }
-  if (source[current++] != expected)
+  if (source[current] != expected)
     return false;
+  current++;
   return true;
 }
 

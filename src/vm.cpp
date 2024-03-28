@@ -15,6 +15,22 @@ inline const Value VM::readConstant() {
   return chunk->getConstants().getValues()[readByte()];
 }
 
+inline const bool VM::isFalsey(const Value &val) {
+  return std::holds_alternative<nil>(val) ||
+         (std::holds_alternative<bool>(val) && std::get<bool>(val));
+}
+
+inline const bool VM::valuesEqual(const Value &a, const Value &b) {
+  return std::visit(
+      overloaded{
+          [](const std::monostate a, const std::monostate b) { return true; },
+          [](const bool a, const bool b) { return a == b; },
+          [](const double a, const double b) { return a == b; },
+          [](const auto a, const auto b) { return false; },
+      },
+      a, b);
+}
+
 const InterpretResult VM::interpret(const std::string_view source) {
   const std::optional<Chunk> &chunk = compiler.compile(source);
   if (!chunk.has_value())
@@ -49,6 +65,15 @@ const InterpretResult VM::run() {
       // printValue(constant);
       // std::cout << "\n";
     } break;
+    case OP_NIL:
+      stack.push_back(nil{});
+      break;
+    case OP_TRUE:
+      stack.push_back(true);
+      break;
+    case OP_FALSE:
+      stack.push_back(false);
+      break;
     case OP_NEGATE: {
       Value &val = stack.back();
       if (!std::holds_alternative<double>(val)) {
@@ -57,18 +82,64 @@ const InterpretResult VM::run() {
       }
       val = -std::get<double>(val);
     } break;
-    case OP_ADD:
-      binary_op([](Value a, Value b) constexpr { return a + b; });
+    case OP_ADD: {
+      auto res = binary_op([](double a, double b) constexpr { return a + b; });
+      if (res == INTERPRET_RUNTIME_ERROR) {
+
+        return res;
+      }
       break;
-    case OP_SUBTRACT:
-      binary_op([](Value a, Value b) constexpr { return a - b; });
+    }
+    case OP_SUBTRACT: {
+      auto res = binary_op([](double a, double b) constexpr { return a - b; });
+      if (res == INTERPRET_RUNTIME_ERROR) {
+
+        return res;
+      }
       break;
-    case OP_MULTIPLY:
-      binary_op([](Value a, Value b) constexpr { return a * b; });
+    }
+    case OP_MULTIPLY: {
+
+      auto res = binary_op([](double a, double b) constexpr { return a * b; });
+      if (res == INTERPRET_RUNTIME_ERROR) {
+
+        return res;
+      }
+    } break;
+    case OP_DIVIDE: {
+      auto res = binary_op([](double a, double b) constexpr { return a / b; });
+      if (res == INTERPRET_RUNTIME_ERROR) {
+        return res;
+      }
       break;
-    case OP_DIVIDE:
-      binary_op([](Value a, Value b) constexpr { return a / b; });
+    }
+    case OP_NOT: {
+      Value &val = stack.back();
+      val = isFalsey(val);
       break;
+    }
+    case OP_EQUAL: {
+      Value a = stack.back();
+      stack.pop_back();
+      Value b = stack.back();
+      stack.pop_back();
+      stack.push_back(valuesEqual(a, b));
+      break;
+    }
+    case OP_GREATER: {
+      auto res = binary_op([](double a, double b) constexpr { return a > b; });
+      if (res == INTERPRET_RUNTIME_ERROR) {
+        return res;
+      }
+      break;
+    }
+    case OP_LESS: {
+      auto res = binary_op([](double a, double b) constexpr { return a < b; });
+      if (res == INTERPRET_RUNTIME_ERROR) {
+        return res;
+      }
+      break;
+    }
     }
   }
   return INTERPRET_COMPILE_ERROR;

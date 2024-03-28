@@ -151,6 +151,9 @@ void Compiler::unary() noexcept {
   parsePrecedence(Precedence::UNARY);
 
   switch (operatorType) {
+  case TokenType::BANG:
+    emitByte(OP_NOT);
+    break;
   case TokenType::MINUS:
     emitByte(OP_NEGATE);
     break;
@@ -179,9 +182,44 @@ void Compiler::binary() noexcept {
   case TokenType::SLASH:
     emitByte(OpCode::OP_DIVIDE);
     break;
+  case TokenType::BANG_EQUAL:
+    emitBytes(OP_EQUAL, OP_NOT);
+    break;
+  case TokenType::EQUAL_EQUAL:
+    emitByte(OP_EQUAL);
+    break;
+  case TokenType::GREATER:
+    emitByte(OP_GREATER);
+    break;
+  case TokenType::GREATER_EQUAL:
+    emitBytes(OP_LESS, OP_NOT);
+    break;
+  case TokenType::LESS:
+    emitByte(OP_LESS);
+    break;
+  case TokenType::LESS_EQUAL:
+    emitBytes(OP_GREATER, OP_NOT);
+    break;
   default:
     // Should be unreachable.
     return;
+  }
+}
+
+// TODO: See diff with function per literal instead of switch.
+void Compiler::literal() noexcept {
+  switch (parser.previous.type) {
+  case TokenType::FALSE:
+    emitByte(OP_FALSE);
+    break;
+  case TokenType::NIL:
+    emitByte(OP_NIL);
+    break;
+  case TokenType::TRUE:
+    emitByte(OP_TRUE);
+    break;
+  default:
+    break;
   }
 }
 

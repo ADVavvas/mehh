@@ -5,6 +5,7 @@
 #include <format>
 #include <iostream>
 #include <string_view>
+#include <variant>
 
 #define STACK_MAX 256
 
@@ -28,6 +29,8 @@ private:
 
   [[nodiscard]] inline const uint8_t readByte();
   [[nodiscard]] inline const Value readConstant();
+  [[nodiscard]] inline const bool isFalsey(const Value &val);
+  [[nodiscard]] inline const bool valuesEqual(const Value &a, const Value &b);
   template <typename... Args>
   void runtimeError(const std::string_view format, Args &&...args) {
 
@@ -38,11 +41,19 @@ private:
     std::cout << std::format("[line {}] in script\n", line);
   }
 
-  template <typename BinaryOperation> void binary_op(BinaryOperation &&op) {
-    Value b = stack.back();
+  template <typename BinaryOperation>
+  InterpretResult binary_op(BinaryOperation &&op) {
+    if (stack.size() < 2 ||
+        !std::holds_alternative<double>(*(stack.end() - 1)) ||
+        !std::holds_alternative<double>(*(stack.end() - 2))) {
+      runtimeError("Operands must be numbers");
+      return INTERPRET_RUNTIME_ERROR;
+    }
+    double b = std::get<double>(stack.back());
     stack.pop_back();
-    Value a = stack.back();
+    double a = std::get<double>(stack.back());
     stack.pop_back();
     stack.push_back(op(a, b));
+    return INTERPRET_OK;
   }
 };

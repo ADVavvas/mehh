@@ -1,5 +1,6 @@
 #include "value.hpp"
 #include <iostream>
+#include <variant>
 
 size_t ValueArray::write(Value value) noexcept {
   values.push_back(value);
@@ -14,4 +15,18 @@ size_t ValueArray::write(Value value) noexcept {
   return values.size();
 }
 
-void printValue(const Value &value) { std::cout << value; }
+void printValue(const Value &value) {
+
+  std::visit(overloaded{
+                 [](const std::monostate val) { std::cout << "nil"; },
+                 [](const bool val) {
+                   if (val) {
+                     std::cout << "true";
+                   } else {
+                     std::cout << "false";
+                   }
+                 },
+                 [](const double val) { std::cout << val; },
+             },
+             value);
+}
