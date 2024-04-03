@@ -3,6 +3,7 @@
 #include "parser.hpp"
 #include "precedence.hpp"
 #include "scanner.hpp"
+#include "string_intern.hpp"
 #include "token.hpp"
 #include <optional>
 #include <string_view>
@@ -24,10 +25,12 @@ public:
 
 class Compiler {
 public:
+  explicit Compiler(StringIntern &stringIntern) : stringIntern{stringIntern} {};
   [[nodiscard]] const std::optional<Chunk>
   compile(const std::string_view source) noexcept;
 
 private:
+  StringIntern &stringIntern;
   Scanner scanner;
   Parser parser;
   Chunk *compilingChunk;
@@ -51,6 +54,7 @@ private:
   void unary() noexcept;
   void binary() noexcept;
   void literal() noexcept;
+  void string() noexcept;
   const ParseRule getRule(const TokenType type) const;
 
 public:
@@ -75,7 +79,7 @@ public:
       {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS
       {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS_EQUAL
       {nullptr, nullptr, Precedence::NONE},                    // IDENTIFIER
-      {nullptr, nullptr, Precedence::NONE},                    // STRING
+      {&Compiler::string, nullptr, Precedence::NONE},          // STRING
       {&Compiler::number, nullptr, Precedence::NONE},          // NUMBER
       {nullptr, nullptr, Precedence::NONE},                    // AND
       {nullptr, nullptr, Precedence::NONE},                    // CLASS

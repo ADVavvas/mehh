@@ -1,9 +1,11 @@
 #pragma once
 #include "chunk.hpp"
 #include "compiler.hpp"
+#include "string_intern.hpp"
 #include <cstdint>
-#include <format>
+#include <fmt/core.h>
 #include <iostream>
+#include <set>
 #include <string_view>
 #include <variant>
 
@@ -23,6 +25,7 @@ public:
 
 private:
   const Chunk *chunk;
+  StringIntern stringIntern;
   Compiler compiler;
   std::vector<uint8_t>::const_iterator ip;
   std::vector<Value> stack;
@@ -34,11 +37,11 @@ private:
   template <typename... Args>
   void runtimeError(const std::string_view format, Args &&...args) {
 
-    std::cout << std::vformat(format, std::make_format_args(args...)) << '\n';
+    std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
 
     size_t instruction = ip - chunk->getCode().begin() - 1;
     size_t line = chunk->getLine(instruction);
-    std::cout << std::format("[line {}] in script\n", line);
+    std::cout << fmt::format("[line {}] in script\n", line);
   }
 
   template <typename BinaryOperation>

@@ -223,6 +223,15 @@ void Compiler::literal() noexcept {
   }
 }
 
+void Compiler::string() noexcept {
+  if (parser.previous.lexeme.size() < 2) {
+    return;
+  }
+  std::string_view interned = stringIntern.intern(
+      parser.previous.lexeme.substr(1, parser.previous.lexeme.size() - 2));
+  emitConstant(interned);
+}
+
 const ParseRule Compiler::getRule(const TokenType type) const {
   return rules[static_cast<std::underlying_type<TokenType>::type>(type)];
 }

@@ -2,7 +2,7 @@
 #include <iostream>
 #include <variant>
 
-size_t ValueArray::write(Value value) noexcept {
+size_t ValueArray::write(const Value &value) noexcept {
   values.push_back(value);
   return values.size() - 1;
 }
@@ -27,6 +27,7 @@ void printValue(const Value &value) {
                    }
                  },
                  [](const double val) { std::cout << val; },
+                 [](const std::string_view val) { std::cout << val; },
              },
              value);
 }

@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "Tracy.hpp"
+// #include "Tracy.hpp"
 
 int main(int argc, char *argv[]) {
   Mehh mehh{};

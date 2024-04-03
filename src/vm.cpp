@@ -1,13 +1,16 @@
 #include "vm.hpp"
 #include "chunk.hpp"
 #include "common.hpp"
+#include "compiler.hpp"
 #include "debug.hpp"
 #include "value.hpp"
 #include <iostream>
 #include <string_view>
 #include <variant>
 
-VM::VM() noexcept { stack.reserve(STACK_MAX); }
+VM::VM() noexcept : compiler(Compiler{stringIntern}) {
+  stack.reserve(STACK_MAX);
+}
 
 inline const uint8_t VM::readByte() { return *ip++; }
 
@@ -26,6 +29,9 @@ inline const bool VM::valuesEqual(const Value &a, const Value &b) {
           [](const std::monostate a, const std::monostate b) { return true; },
           [](const bool a, const bool b) { return a == b; },
           [](const double a, const double b) { return a == b; },
+          [](const std::string_view a, const std::string_view b) {
+            return a == b;
+          },
           [](const auto a, const auto b) { return false; },
       },
       a, b);
@@ -83,12 +89,45 @@ const InterpretResult VM::run() {
       val = -std::get<double>(val);
     } break;
     case OP_ADD: {
-      auto res = binary_op([](double a, double b) constexpr { return a + b; });
-      if (res == INTERPRET_RUNTIME_ERROR) {
-
-        return res;
+      if (stack.size() < 2) {
+        return INTERPRET_RUNTIME_ERROR;
       }
-      break;
+
+      Value b = stack.back();
+      stack.pop_back();
+      Value a = stack.back();
+      stack.pop_back();
+
+      const bool success = std::visit(
+          overloaded{
+              [this](const std::monostate a, const std::monostate b) {
+                runtimeError("Operands must be two numbers or two strings.");
+                return false;
+              },
+              [this](const bool a, const bool b) {
+                runtimeError("Operands must be two numbers or two strings.");
+                return false;
+              },
+              [this](const double a, const double b) {
+                stack.push_back(a + b);
+                return true;
+              },
+              [this](const std::string_view a, const std::string_view b) {
+                std::string_view interned =
+                    stringIntern.intern(std::string{a} + std::string{b});
+                stack.push_back(interned);
+                return true;
+              },
+              [this](const auto a, const auto b) {
+                runtimeError("Operands must be two numbers or two strings.");
+                return false;
+              },
+          },
+          a, b);
+      if (success) {
+        break;
+      }
+      return INTERPRET_RUNTIME_ERROR;
     }
     case OP_SUBTRACT: {
       auto res = binary_op([](double a, double b) constexpr { return a - b; });

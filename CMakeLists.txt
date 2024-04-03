@@ -19,21 +19,21 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 # Tracy (consider using CMake like GTest)
-add_compile_definitions(TRACY_ENABLE)
-set(TRACY_SRC_DIR
-${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public
-)
+# add_compile_definitions(TRACY_ENABLE)
+# set(TRACY_SRC_DIR
+# ${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public
+# )
 
-set(TRACY_INC
-${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public/tracy
-)
+# set(TRACY_INC
+# ${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public/tracy
+# )
 
 set (MEHH_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set (MEHH_INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set (MEHH_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/tests)
 
 set (MEHH_SRC 
-${TRACY_SRC_DIR}/TracyClient.cpp
+# ${TRACY_SRC_DIR}/TracyClient.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
 ${MEHH_SRC_DIR}/compiler.cpp
 ${MEHH_SRC_DIR}/debug.cpp
@@ -56,6 +56,8 @@ ${MEHH_SRC_DIR}/value.cpp
 ${MEHH_SRC_DIR}/vm.cpp
 )
 
+add_subdirectory(external/fmt)
+
 add_executable(mehh ${MEHH_SRC})
 add_executable(mehh_test ${MEHH_TESTS})
 
@@ -63,8 +65,14 @@ target_include_directories(mehh PUBLIC ${MEHH_INC_DIR} ${TRACY_INC})
 target_include_directories(mehh_test PUBLIC ${MEHH_INC_DIR} ${TRACY_INC})
 
 target_link_libraries(
+  mehh
+  fmt::fmt
+)
+
+target_link_libraries(
   mehh_test
   GTest::gtest_main
+  fmt::fmt
 )
 
 include(GoogleTest)

@@ -2,6 +2,7 @@ build
 .cache
 *.code-workspace
 .vscode
+.DS_Store
 
 CMakeLists.txt.user
 CMakeCache.txt

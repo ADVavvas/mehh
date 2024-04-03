@@ -1,12 +1,13 @@
 #include "debug.hpp"
 #include "chunk.hpp"
 #include <cstdint>
+#include <fmt/core.h>
 #include <format>
 #include <iomanip>
 #include <iostream>
 
 void disassembleChunk(const Chunk &chunk, const std::string_view name) {
-  std::cout << std::format("== {} ==\n", name);
+  std::cout << fmt::format("== {} ==\n", name);
 
   for (size_t offset = 0; offset < chunk.count();) {
     offset = disassembleInstruction(chunk, offset);
