@@ -29,6 +29,7 @@ private:
   Compiler compiler;
   std::vector<uint8_t>::const_iterator ip;
   std::vector<Value> stack;
+  std::unordered_map<std::string_view, Value> globals;
 
   [[nodiscard]] inline const uint8_t readByte();
   [[nodiscard]] inline const Value readConstant();

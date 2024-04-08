@@ -61,9 +61,6 @@ const InterpretResult VM::run() {
     uint8_t instruction;
     switch (instruction = readByte()) {
     case OP_RETURN:
-      printValue(stack.back());
-      std::cout << "\n";
-      stack.pop_back();
       return INTERPRET_OK;
     case OP_CONSTANT: {
       const Value &constant = readConstant();
@@ -179,6 +176,55 @@ const InterpretResult VM::run() {
       }
       break;
     }
+    case OP_PRINT: {
+      printValue(stack.back());
+      std::cout << "\n";
+      stack.pop_back();
+      break;
+    }
+    case OP_DEFINE_GLOBAL: {
+      const Value &name = readConstant();
+      if (!std::holds_alternative<std::string_view>(name)) {
+        break;
+      }
+      const Value value = stack.back();
+      const std::string_view nameStr = std::get<std::string_view>(name);
+
+      globals.insert_or_assign(nameStr, value);
+      stack.pop_back();
+      break;
+    }
+    case OP_GET_GLOBAL: {
+      const Value &value = readConstant();
+      if (!std::holds_alternative<std::string_view>(value)) {
+        break;
+      }
+      const auto &variable = globals.find(std::get<std::string_view>(value));
+      if (variable == globals.end()) {
+        runtimeError("Undefined variable '{}.'",
+                     std::get<std::string_view>(value));
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      stack.push_back(variable->second);
+      break;
+    }
+    case OP_SET_GLOBAL: {
+      const Value &name = readConstant();
+      if (!std::holds_alternative<std::string_view>(name)) {
+        break;
+      }
+      const Value value = stack.back();
+      const std::string_view nameStr = std::get<std::string_view>(name);
+      if (!globals.contains(nameStr)) {
+        runtimeError("Undefined variable '{}'.", nameStr);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      globals[std::string{nameStr}] = value;
+      break;
+    }
+    case OP_POP:
+      stack.pop_back();
+      break;
     }
   }
   return INTERPRET_COMPILE_ERROR;

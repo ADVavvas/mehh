@@ -22,8 +22,9 @@ Compiler::compile(const std::string_view source) noexcept {
   parser.panicMode = false;
 
   advance();
-  expression();
-  consume(TokenType::END_OF_FILE, "Expect end of expression");
+  while (!match(TokenType::END_OF_FILE)) {
+    declaration();
+  }
   endCompiler();
   if (!parser.hadError) {
     return std::make_optional(chunk);
@@ -31,7 +32,42 @@ Compiler::compile(const std::string_view source) noexcept {
   return std::nullopt;
 }
 
+void Compiler::synchronize() {
+  parser.panicMode = false;
+  // Skip tokens until we find a semicolon (end of statement) or a token that
+  // starts a statement.
+  while (parser.current.type != TokenType::END_OF_FILE) {
+    if (parser.previous.type == TokenType::SEMICOLON) {
+      return;
+    }
+    switch (parser.current.type) {
+    case TokenType::CLASS:
+    case TokenType::FUN:
+    case TokenType::VAR:
+    case TokenType::FOR:
+    case TokenType::IF:
+    case TokenType::WHILE:
+    case TokenType::PRINT:
+    case TokenType::RETURN:
+      return;
+    default:;
+    }
+  }
+}
+
 Chunk &Compiler::currentChunk() const noexcept { return *compilingChunk; }
+
+[[nodiscard]] inline bool Compiler::check(const TokenType type) noexcept {
+  return parser.current.type == type;
+}
+
+[[nodiscard]] bool Compiler::match(const TokenType type) noexcept {
+  if (!check(type)) {
+    return false;
+  }
+  advance();
+  return true;
+}
 
 void Compiler::advance() noexcept {
   parser.previous = parser.current;
@@ -122,6 +158,7 @@ void Compiler::parsePrecedence(const Precedence precedence) noexcept {
     return;
   }
 
+  canAssign = precedence <= Precedence::ASSIGNMENT;
   (*this.*prefixRule)();
 
   while (precedence <= getRule(parser.current.type).precedence) {
@@ -129,7 +166,35 @@ void Compiler::parsePrecedence(const Precedence precedence) noexcept {
     const ParseFn infixRule = getRule(parser.previous.type).infix;
     (*this.*infixRule)();
   }
+  if (canAssign && match(TokenType::EQUAL)) {
+    error("Invalid assignment target.");
+  }
 };
+
+const uint8_t
+Compiler::parseVariable(const std::string_view errorMessage) noexcept {
+  consume(TokenType::IDENTIFIER, errorMessage);
+  return identifierConstant(parser.previous);
+}
+
+const uint8_t Compiler::identifierConstant(const Token &name) noexcept {
+  std::string_view interned = stringIntern.intern(parser.previous.lexeme);
+  return makeConstant(interned);
+}
+
+void Compiler::defineVariable(uint8_t global) noexcept {
+  emitBytes(OpCode::OP_DEFINE_GLOBAL, global);
+}
+
+void Compiler::namedVariable(const Token &name) noexcept {
+  const uint8_t arg = identifierConstant(name);
+  if (canAssign && match(TokenType::EQUAL)) {
+    expression();
+    emitBytes(OpCode::OP_SET_GLOBAL, arg);
+  } else {
+    emitBytes(OpCode::OP_GET_GLOBAL, arg);
+  }
+}
 
 void Compiler::expression() noexcept {
   parsePrecedence(Precedence::ASSIGNMENT);
@@ -230,6 +295,51 @@ void Compiler::string() noexcept {
   std::string_view interned = stringIntern.intern(
       parser.previous.lexeme.substr(1, parser.previous.lexeme.size() - 2));
   emitConstant(interned);
+}
+
+void Compiler::variable() noexcept { namedVariable(parser.previous); }
+
+void Compiler::declaration() noexcept {
+  if (match(TokenType::VAR)) {
+    varDeclaration();
+  } else {
+    statement();
+  }
+  if (parser.panicMode) {
+    synchronize();
+  }
+}
+
+void Compiler::varDeclaration() noexcept {
+  uint8_t global = parseVariable("Expect variable name.");
+
+  if (match(TokenType::EQUAL)) {
+    expression();
+  } else {
+    emitByte(OP_NIL);
+  }
+  consume(TokenType::SEMICOLON, "Expect ';' after variable declaration");
+  defineVariable(global);
+}
+
+void Compiler::statement() noexcept {
+  if (match(TokenType::PRINT)) {
+    printStatement();
+  } else {
+    expressionStatement();
+  }
+}
+
+void Compiler::printStatement() noexcept {
+  expression();
+  consume(TokenType::SEMICOLON, "Expected ';' after expression");
+  emitByte(OP_PRINT);
+}
+
+void Compiler::expressionStatement() noexcept {
+  expression();
+  consume(TokenType::SEMICOLON, "Expected ';' after expression");
+  emitByte(OP_POP);
 }
 
 const ParseRule Compiler::getRule(const TokenType type) const {

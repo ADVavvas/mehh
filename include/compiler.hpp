@@ -5,6 +5,7 @@
 #include "scanner.hpp"
 #include "string_intern.hpp"
 #include "token.hpp"
+#include <_types/_uint8_t.h>
 #include <optional>
 #include <string_view>
 
@@ -34,20 +35,29 @@ private:
   Scanner scanner;
   Parser parser;
   Chunk *compilingChunk;
+  bool canAssign;
 
+  void synchronize();
   [[nodiscard]] Chunk &currentChunk() const noexcept;
+  [[nodiscard]] inline bool check(const TokenType type) noexcept;
+  [[nodiscard]] bool match(const TokenType type) noexcept;
   void advance() noexcept;
   void consume(const TokenType type, const std::string_view message) noexcept;
   void error(const std::string_view message) noexcept;
   void errorAt(const Token &token, const std::string_view message) noexcept;
   void errorAtCurrent(const std::string_view message) noexcept;
   void endCompiler() noexcept;
+  const ParseRule getRule(const TokenType type) const;
   inline uint8_t makeConstant(const Value &value) noexcept;
   inline void emitByte(uint8_t byte) noexcept;
   inline void emitBytes(uint8_t byte1, uint8_t byte2) noexcept;
   inline void emitReturn() noexcept;
   inline void emitConstant(const Value &value) noexcept;
   void parsePrecedence(const Precedence precedence) noexcept;
+  const uint8_t parseVariable(const std::string_view errorMessage) noexcept;
+  const uint8_t identifierConstant(const Token &name) noexcept;
+  void defineVariable(uint8_t global) noexcept;
+  void namedVariable(const Token &name) noexcept;
   void expression() noexcept;
   void number() noexcept;
   void grouping() noexcept;
@@ -55,7 +65,12 @@ private:
   void binary() noexcept;
   void literal() noexcept;
   void string() noexcept;
-  const ParseRule getRule(const TokenType type) const;
+  void variable() noexcept;
+  void declaration() noexcept;
+  void varDeclaration() noexcept;
+  void statement() noexcept;
+  void printStatement() noexcept;
+  void expressionStatement() noexcept;
 
 public:
   constexpr static ParseRule rules[40] = {
@@ -78,7 +93,7 @@ public:
       {nullptr, &Compiler::binary, Precedence::COMPARISON},    // GREATER_EQUAL
       {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS
       {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS_EQUAL
-      {nullptr, nullptr, Precedence::NONE},                    // IDENTIFIER
+      {&Compiler::variable, nullptr, Precedence::NONE},        // IDENTIFIER
       {&Compiler::string, nullptr, Precedence::NONE},          // STRING
       {&Compiler::number, nullptr, Precedence::NONE},          // NUMBER
       {nullptr, nullptr, Precedence::NONE},                    // AND

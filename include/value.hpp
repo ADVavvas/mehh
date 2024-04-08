@@ -6,7 +6,7 @@
 #include <vector>
 
 using nil = std::monostate;
-using Value = std::variant<double, bool, nil, const std::string_view>;
+using Value = std::variant<double, bool, nil, std::string_view>;
 
 template <typename... Ts> struct overloaded : Ts... {
   using Ts::operator()...;
