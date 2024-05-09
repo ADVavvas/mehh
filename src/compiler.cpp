@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "precedence.hpp"
 #include "token.hpp"
+#include <_types/_uint8_t.h>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -126,6 +127,35 @@ void Compiler::endCompiler() noexcept {
 #endif
 }
 
+void Compiler::beginScope() noexcept { scopeDepth++; }
+
+void Compiler::endScope() noexcept {
+  scopeDepth--;
+  while (!locals.empty() && locals.back().depth > scopeDepth) {
+    emitByte(OP_POP);
+    locals.pop_back();
+  }
+}
+
+void Compiler::addLocal(const Token &token) noexcept {
+  // TODO: Enforce max depth.
+  locals.push_back({token, UINT8_MAX});
+}
+
+uint8_t Compiler::resolveLocal(const Token &token) noexcept {
+  for (auto it = locals.rbegin(); it != locals.rend(); ++it) {
+    if (it->name.lexeme == token.lexeme) {
+      if (it->depth == UINT8_MAX) {
+        error("Cannot read local variable in its own initializer.");
+      }
+      return static_cast<uint8_t>(std::distance(it, locals.rend()) - 1);
+    }
+  }
+  return UINT8_MAX;
+}
+
+void Compiler::markInitialized() noexcept { locals.back().depth = scopeDepth; }
+
 uint8_t Compiler::makeConstant(const Value &value) noexcept {
   size_t constant = currentChunk().writeConstant(value);
   if (constant > UINT8_MAX) {
@@ -174,6 +204,12 @@ void Compiler::parsePrecedence(const Precedence precedence) noexcept {
 const uint8_t
 Compiler::parseVariable(const std::string_view errorMessage) noexcept {
   consume(TokenType::IDENTIFIER, errorMessage);
+
+  declareVariable();
+  if (scopeDepth > 0) {
+    return 0;
+  }
+
   return identifierConstant(parser.previous);
 }
 
@@ -183,16 +219,47 @@ const uint8_t Compiler::identifierConstant(const Token &name) noexcept {
 }
 
 void Compiler::defineVariable(uint8_t global) noexcept {
+  if (scopeDepth > 0) {
+    markInitialized();
+    return;
+  }
   emitBytes(OpCode::OP_DEFINE_GLOBAL, global);
 }
 
+void Compiler::declareVariable() noexcept {
+  if (scopeDepth == 0) {
+    return;
+  }
+
+  const Token name = parser.previous;
+  for (auto rit = locals.rbegin(); rit != locals.rend(); ++rit) {
+    if (rit->depth != UINT8_MAX && rit->depth < scopeDepth) {
+      break;
+    }
+
+    if (rit->name.lexeme == name.lexeme) {
+      error("Variable with this name already declared in this scope.");
+    }
+  }
+  addLocal(name);
+}
+
 void Compiler::namedVariable(const Token &name) noexcept {
-  const uint8_t arg = identifierConstant(name);
+  uint8_t getOp, setOp;
+  uint8_t arg = resolveLocal(name);
+  if (arg != UINT8_MAX) {
+    getOp = OpCode::OP_GET_LOCAL;
+    setOp = OpCode::OP_SET_LOCAL;
+  } else {
+    arg = identifierConstant(name);
+    getOp = OpCode::OP_GET_GLOBAL;
+    setOp = OpCode::OP_SET_GLOBAL;
+  }
   if (canAssign && match(TokenType::EQUAL)) {
     expression();
-    emitBytes(OpCode::OP_SET_GLOBAL, arg);
+    emitBytes(setOp, arg);
   } else {
-    emitBytes(OpCode::OP_GET_GLOBAL, arg);
+    emitBytes(getOp, arg);
   }
 }
 
@@ -299,6 +366,14 @@ void Compiler::string() noexcept {
 
 void Compiler::variable() noexcept { namedVariable(parser.previous); }
 
+void Compiler::block() noexcept {
+  while (!check(TokenType::RIGHT_BRACE) && !check(TokenType::END_OF_FILE)) {
+    declaration();
+  }
+
+  consume(TokenType::RIGHT_BRACE, "Expect '}' after block.");
+}
+
 void Compiler::declaration() noexcept {
   if (match(TokenType::VAR)) {
     varDeclaration();
@@ -325,6 +400,10 @@ void Compiler::varDeclaration() noexcept {
 void Compiler::statement() noexcept {
   if (match(TokenType::PRINT)) {
     printStatement();
+  } else if (match(TokenType::LEFT_BRACE)) {
+    beginScope();
+    block();
+    endScope();
   } else {
     expressionStatement();
   }

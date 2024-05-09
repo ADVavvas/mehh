@@ -67,6 +67,10 @@ size_t disassembleInstruction(const Chunk &chunk, size_t offset) {
     return constantInstruction("OP_GET_GLOBAL", chunk, offset);
   case OP_SET_GLOBAL:
     return constantInstruction("OP_SET_GLOBAL", chunk, offset);
+  case OP_GET_LOCAL:
+    return byteInstruction("OP_GET_LOCAL", chunk, offset);
+  case OP_SET_LOCAL:
+    return byteInstruction("OP_SET_LOCAL", chunk, offset);
   default:
     std::cout << "Unknown opcode: " << instruction;
     return offset;
@@ -77,11 +81,19 @@ size_t simpleInstruction(const std::string_view name, size_t offset) {
   std::cout << name << "\n";
   return offset + 1;
 }
+
 size_t constantInstruction(const std::string_view name, const Chunk &chunk,
                            size_t offset) {
   uint8_t constant = chunk.getCode()[offset + 1];
   std::cout << name << " " << constant << '\'';
   printValue(chunk.getConstants().getValues()[constant]);
   std::cout << '\'' << "\n";
+  return offset + 2;
+}
+
+size_t byteInstruction(const std::string_view name, const Chunk &chunk,
+                       size_t offset) {
+  uint8_t slot = chunk.getCode()[offset + 1];
+  std::cout << name << " " << slot << '\'';
   return offset + 2;
 }

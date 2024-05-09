@@ -5,6 +5,7 @@
 #include "scanner.hpp"
 #include "string_intern.hpp"
 #include "token.hpp"
+#include <_types/_uint16_t.h>
 #include <_types/_uint8_t.h>
 #include <optional>
 #include <string_view>
@@ -24,6 +25,11 @@ public:
   }
 };
 
+struct Local {
+  Token name;
+  uint8_t depth;
+};
+
 class Compiler {
 public:
   explicit Compiler(StringIntern &stringIntern) : stringIntern{stringIntern} {};
@@ -31,10 +37,12 @@ public:
   compile(const std::string_view source) noexcept;
 
 private:
+  std::vector<Local> locals;
   StringIntern &stringIntern;
   Scanner scanner;
   Parser parser;
   Chunk *compilingChunk;
+  uint8_t scopeDepth;
   bool canAssign;
 
   void synchronize();
@@ -47,6 +55,11 @@ private:
   void errorAt(const Token &token, const std::string_view message) noexcept;
   void errorAtCurrent(const std::string_view message) noexcept;
   void endCompiler() noexcept;
+  void beginScope() noexcept;
+  void endScope() noexcept;
+  void addLocal(const Token &token) noexcept;
+  uint8_t resolveLocal(const Token &token) noexcept;
+  void markInitialized() noexcept;
   const ParseRule getRule(const TokenType type) const;
   inline uint8_t makeConstant(const Value &value) noexcept;
   inline void emitByte(uint8_t byte) noexcept;
@@ -57,6 +70,7 @@ private:
   const uint8_t parseVariable(const std::string_view errorMessage) noexcept;
   const uint8_t identifierConstant(const Token &name) noexcept;
   void defineVariable(uint8_t global) noexcept;
+  void declareVariable() noexcept;
   void namedVariable(const Token &name) noexcept;
   void expression() noexcept;
   void number() noexcept;
@@ -66,6 +80,7 @@ private:
   void literal() noexcept;
   void string() noexcept;
   void variable() noexcept;
+  void block() noexcept;
   void declaration() noexcept;
   void varDeclaration() noexcept;
   void statement() noexcept;

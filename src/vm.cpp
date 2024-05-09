@@ -4,6 +4,7 @@
 #include "compiler.hpp"
 #include "debug.hpp"
 #include "value.hpp"
+#include <_types/_uint8_t.h>
 #include <iostream>
 #include <string_view>
 #include <variant>
@@ -220,6 +221,16 @@ const InterpretResult VM::run() {
         return INTERPRET_RUNTIME_ERROR;
       }
       globals[std::string{nameStr}] = value;
+      break;
+    }
+    case OP_GET_LOCAL: {
+      uint8_t slot = readByte();
+      stack.push_back(stack[slot]);
+      break;
+    }
+    case OP_SET_LOCAL: {
+      uint8_t slot = readByte();
+      stack[slot] = stack.back();
       break;
     }
     case OP_POP:
