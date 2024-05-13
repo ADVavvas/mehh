@@ -180,6 +180,13 @@ void Compiler::emitConstant(const Value &value) noexcept {
   emitBytes(OpCode::OP_CONSTANT, makeConstant(value));
 }
 
+size_t Compiler::emitJump(const uint8_t instruction) noexcept {
+  emitByte(instruction);
+  emitByte(0xff);
+  emitByte(0xff);
+  return currentChunk().count() - 2;
+}
+
 void Compiler::parsePrecedence(const Precedence precedence) noexcept {
   advance();
   const ParseFn prefixRule = getRule(parser.previous.type).prefix;
@@ -263,6 +270,16 @@ void Compiler::namedVariable(const Token &name) noexcept {
   }
 }
 
+void Compiler::patchJump(size_t offset) noexcept {
+  // -2 to adjust for the bytecode for the jump offset itself.
+  size_t jump = currentChunk().count() - offset - 2;
+  if (jump > UINT16_MAX) {
+    error("Too much code to jump over.");
+  }
+  currentChunk().code()[offset] = (jump >> 8) & 0xff;
+  currentChunk().code()[offset + 1] = jump & 0xff;
+}
+
 void Compiler::expression() noexcept {
   parsePrecedence(Precedence::ASSIGNMENT);
 }
@@ -338,6 +355,24 @@ void Compiler::binary() noexcept {
   }
 }
 
+void Compiler::and_() noexcept {
+  size_t endJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  parsePrecedence(Precedence::AND);
+  patchJump(endJump);
+}
+
+void Compiler::or_() noexcept {
+  size_t elseJump = emitJump(OP_JUMP_IF_FALSE);
+  size_t endJump = emitJump(OP_JUMP);
+
+  patchJump(elseJump);
+  emitByte(OP_POP);
+
+  parsePrecedence(Precedence::OR);
+  patchJump(endJump);
+}
+
 // TODO: See diff with function per literal instead of switch.
 void Compiler::literal() noexcept {
   switch (parser.previous.type) {
@@ -404,6 +439,8 @@ void Compiler::statement() noexcept {
     beginScope();
     block();
     endScope();
+  } else if (match(TokenType::IF)) {
+    ifStatement();
   } else {
     expressionStatement();
   }
@@ -419,6 +456,24 @@ void Compiler::expressionStatement() noexcept {
   expression();
   consume(TokenType::SEMICOLON, "Expected ';' after expression");
   emitByte(OP_POP);
+}
+
+void Compiler::ifStatement() noexcept {
+  consume(TokenType::LEFT_PAREN, "Expect '(' after 'if'");
+  expression();
+  consume(TokenType::RIGHT_PAREN, "Expect ')' after condition");
+
+  size_t thenJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+  size_t elseJump = emitJump(OP_JUMP);
+  patchJump(thenJump);
+  emitByte(OP_POP);
+
+  if (match(TokenType::ELSE)) {
+    statement();
+  }
+  patchJump(elseJump);
 }
 
 const ParseRule Compiler::getRule(const TokenType type) const {

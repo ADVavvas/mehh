@@ -71,6 +71,10 @@ size_t disassembleInstruction(const Chunk &chunk, size_t offset) {
     return byteInstruction("OP_GET_LOCAL", chunk, offset);
   case OP_SET_LOCAL:
     return byteInstruction("OP_SET_LOCAL", chunk, offset);
+  case OP_JUMP:
+    return byteInstruction("OP_JUMP", chunk, offset);
+  case OP_JUMP_IF_FALSE:
+    return byteInstruction("OP_JUMP_IF_FALSE", chunk, offset);
   default:
     std::cout << "Unknown opcode: " << instruction;
     return offset;
@@ -96,4 +100,13 @@ size_t byteInstruction(const std::string_view name, const Chunk &chunk,
   uint8_t slot = chunk.getCode()[offset + 1];
   std::cout << name << " " << slot << '\'';
   return offset + 2;
+}
+
+size_t jumpInstruction(const std::string_view name, const int sign,
+                       const Chunk &chunk, size_t offset) {
+  uint16_t jump =
+      chunk.getCode()[offset + 1] << 8 | chunk.getCode()[offset + 2];
+  std::cout << name << " " << offset << " -> " << offset + 3 + sign * jump
+            << "\n";
+  return offset + 3;
 }

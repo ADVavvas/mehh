@@ -66,17 +66,22 @@ private:
   inline void emitBytes(uint8_t byte1, uint8_t byte2) noexcept;
   inline void emitReturn() noexcept;
   inline void emitConstant(const Value &value) noexcept;
+  inline size_t emitJump(const uint8_t instruction) noexcept;
   void parsePrecedence(const Precedence precedence) noexcept;
   const uint8_t parseVariable(const std::string_view errorMessage) noexcept;
   const uint8_t identifierConstant(const Token &name) noexcept;
   void defineVariable(uint8_t global) noexcept;
   void declareVariable() noexcept;
   void namedVariable(const Token &name) noexcept;
+  void patchJump(size_t offset) noexcept;
+
   void expression() noexcept;
   void number() noexcept;
   void grouping() noexcept;
   void unary() noexcept;
   void binary() noexcept;
+  void and_() noexcept;
+  void or_() noexcept;
   void literal() noexcept;
   void string() noexcept;
   void variable() noexcept;
@@ -86,6 +91,7 @@ private:
   void statement() noexcept;
   void printStatement() noexcept;
   void expressionStatement() noexcept;
+  void ifStatement() noexcept;
 
 public:
   constexpr static ParseRule rules[40] = {
@@ -111,7 +117,7 @@ public:
       {&Compiler::variable, nullptr, Precedence::NONE},        // IDENTIFIER
       {&Compiler::string, nullptr, Precedence::NONE},          // STRING
       {&Compiler::number, nullptr, Precedence::NONE},          // NUMBER
-      {nullptr, nullptr, Precedence::NONE},                    // AND
+      {nullptr, &Compiler::and_, Precedence::AND},             // AND
       {nullptr, nullptr, Precedence::NONE},                    // CLASS
       {nullptr, nullptr, Precedence::NONE},                    // ELSE
       {&Compiler::literal, nullptr, Precedence::NONE},         // FALSE
@@ -119,7 +125,7 @@ public:
       {nullptr, nullptr, Precedence::NONE},                    // FUN
       {nullptr, nullptr, Precedence::NONE},                    // IF
       {&Compiler::literal, nullptr, Precedence::NONE},         // NIL
-      {nullptr, nullptr, Precedence::NONE},                    // OR
+      {nullptr, &Compiler::or_, Precedence::OR},               // OR
       {nullptr, nullptr, Precedence::NONE},                    // PRINT
       {nullptr, nullptr, Precedence::NONE},                    // RETURN
       {nullptr, nullptr, Precedence::NONE},                    // SUPER

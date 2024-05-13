@@ -24,6 +24,8 @@ enum OpCode : uint8_t {
   OP_NOT,
   OP_NEGATE,
   OP_PRINT,
+  OP_JUMP,
+  OP_JUMP_IF_FALSE,
   OP_RETURN,
 };
 
@@ -38,13 +40,14 @@ public:
   void write(uint8_t byte, size_t line) noexcept;
   size_t writeConstant(const Value &value) noexcept;
   [[nodiscard]] const std::vector<uint8_t> &getCode() const noexcept;
+  [[nodiscard]] std::vector<uint8_t> &code() noexcept;
   [[nodiscard]] const uint8_t getLine(size_t offset) const noexcept;
   [[nodiscard]] const std::vector<Line> &getLines() const noexcept;
   [[nodiscard]] const ValueArray &getConstants() const noexcept;
   [[nodiscard]] const size_t count() const noexcept;
 
 private:
-  std::vector<uint8_t> code;
+  std::vector<uint8_t> code_;
   std::vector<Line> lines;
   ValueArray constants;
 };

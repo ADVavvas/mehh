@@ -15,6 +15,11 @@ VM::VM() noexcept : compiler(Compiler{stringIntern}) {
 
 inline const uint8_t VM::readByte() { return *ip++; }
 
+inline const uint16_t VM::readShort() {
+  ip += 2;
+  return *(ip - 1) | (*(ip - 2) << 8);
+}
+
 inline const Value VM::readConstant() {
   return chunk->getConstants().getValues()[readByte()];
 }
@@ -235,6 +240,16 @@ const InterpretResult VM::run() {
     }
     case OP_POP:
       stack.pop_back();
+      break;
+    case OP_JUMP_IF_FALSE: {
+      uint16_t offset = readShort();
+      if (isFalsey(stack.back())) {
+        ip += offset;
+      }
+      break;
+    }
+    case OP_JUMP:
+      ip += readShort();
       break;
     }
   }

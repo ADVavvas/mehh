@@ -14,3 +14,7 @@ void disassembleChunk(const Chunk &chunk, std::string_view name);
 
 [[nodiscard]] size_t byteInstruction(const std::string_view name,
                                      const Chunk &chunk, size_t offset);
+
+[[nodiscard]] size_t jumpInstruction(const std::string_view name,
+                                     const int sign, const Chunk &chunk,
+                                     size_t offset);

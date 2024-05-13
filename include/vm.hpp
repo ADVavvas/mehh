@@ -32,6 +32,7 @@ private:
   std::unordered_map<std::string_view, Value> globals;
 
   [[nodiscard]] inline const uint8_t readByte();
+  [[nodiscard]] inline const uint16_t readShort();
   [[nodiscard]] inline const Value readConstant();
   [[nodiscard]] inline const bool isFalsey(const Value &val);
   [[nodiscard]] inline const bool valuesEqual(const Value &a, const Value &b);
