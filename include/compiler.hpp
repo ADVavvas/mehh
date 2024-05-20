@@ -67,6 +67,7 @@ private:
   inline void emitReturn() noexcept;
   inline void emitConstant(const Value &value) noexcept;
   inline size_t emitJump(const uint8_t instruction) noexcept;
+  inline void emitLoop(const size_t loopStart) noexcept;
   void parsePrecedence(const Precedence precedence) noexcept;
   const uint8_t parseVariable(const std::string_view errorMessage) noexcept;
   const uint8_t identifierConstant(const Token &name) noexcept;
@@ -92,6 +93,7 @@ private:
   void printStatement() noexcept;
   void expressionStatement() noexcept;
   void ifStatement() noexcept;
+  void whileStatement() noexcept;
 
 public:
   constexpr static ParseRule rules[40] = {

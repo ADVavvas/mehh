@@ -4,6 +4,7 @@
 #include "precedence.hpp"
 #include "token.hpp"
 #include <_types/_uint8_t.h>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -185,6 +186,17 @@ size_t Compiler::emitJump(const uint8_t instruction) noexcept {
   emitByte(0xff);
   emitByte(0xff);
   return currentChunk().count() - 2;
+}
+
+void Compiler::emitLoop(const size_t loopStart) noexcept {
+  emitByte(OpCode::OP_LOOP);
+  size_t offset = currentChunk().count() - loopStart + 2;
+  if (offset > UINT16_MAX) {
+    error("Loop body too large.");
+  }
+
+  emitByte((offset >> 8) & 0xff);
+  emitByte(offset & 0xff);
 }
 
 void Compiler::parsePrecedence(const Precedence precedence) noexcept {
@@ -435,6 +447,8 @@ void Compiler::varDeclaration() noexcept {
 void Compiler::statement() noexcept {
   if (match(TokenType::PRINT)) {
     printStatement();
+  } else if (match(TokenType::WHILE)) {
+    whileStatement();
   } else if (match(TokenType::LEFT_BRACE)) {
     beginScope();
     block();
@@ -474,6 +488,21 @@ void Compiler::ifStatement() noexcept {
     statement();
   }
   patchJump(elseJump);
+}
+
+void Compiler::whileStatement() noexcept {
+  size_t loopStart = currentChunk().count();
+  consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'");
+  expression();
+  consume(TokenType::RIGHT_PAREN, "Expect ')' after condition");
+
+  size_t exitJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+
+  statement();
+  emitLoop(loopStart);
+  patchJump(exitJump);
+  emitByte(OP_POP);
 }
 
 const ParseRule Compiler::getRule(const TokenType type) const {

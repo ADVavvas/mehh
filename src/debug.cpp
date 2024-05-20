@@ -72,9 +72,11 @@ size_t disassembleInstruction(const Chunk &chunk, size_t offset) {
   case OP_SET_LOCAL:
     return byteInstruction("OP_SET_LOCAL", chunk, offset);
   case OP_JUMP:
-    return byteInstruction("OP_JUMP", chunk, offset);
+    return jumpInstruction("OP_JUMP", 1, chunk, offset);
   case OP_JUMP_IF_FALSE:
-    return byteInstruction("OP_JUMP_IF_FALSE", chunk, offset);
+    return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
+  case OP_LOOP:
+    return jumpInstruction("OP_LOOP", -1, chunk, offset);
   default:
     std::cout << "Unknown opcode: " << instruction;
     return offset;

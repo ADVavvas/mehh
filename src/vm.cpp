@@ -251,6 +251,11 @@ const InterpretResult VM::run() {
     case OP_JUMP:
       ip += readShort();
       break;
+    case OP_LOOP: {
+      uint16_t offset = readShort();
+      ip -= offset;
+      break;
+    }
     }
   }
   return INTERPRET_COMPILE_ERROR;
