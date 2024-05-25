@@ -94,6 +94,7 @@ private:
   void expressionStatement() noexcept;
   void ifStatement() noexcept;
   void whileStatement() noexcept;
+  void forStatement() noexcept;
 
 public:
   constexpr static ParseRule rules[40] = {

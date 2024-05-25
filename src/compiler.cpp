@@ -449,6 +449,8 @@ void Compiler::statement() noexcept {
     printStatement();
   } else if (match(TokenType::WHILE)) {
     whileStatement();
+  } else if (match(TokenType::FOR)) {
+    forStatement();
   } else if (match(TokenType::LEFT_BRACE)) {
     beginScope();
     block();
@@ -503,6 +505,49 @@ void Compiler::whileStatement() noexcept {
   emitLoop(loopStart);
   patchJump(exitJump);
   emitByte(OP_POP);
+}
+
+void Compiler::forStatement() noexcept {
+  beginScope();
+  consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'");
+  if (match(TokenType::SEMICOLON)) {
+    // No initializer.
+  } else if (match(TokenType::VAR)) {
+    varDeclaration();
+  } else {
+    expressionStatement();
+  }
+
+  size_t loopStart = currentChunk().count();
+  size_t exitJump = 0;
+  if (!match(TokenType::SEMICOLON)) {
+    expression();
+    consume(TokenType::SEMICOLON, "Expect ';' after for loop condition");
+    exitJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+  }
+
+  // Increment statement.
+  if (!match(TokenType::RIGHT_PAREN)) {
+    size_t bodyJump = emitJump(OP_JUMP);
+    size_t incrementStart = currentChunk().count();
+    expression();
+    emitByte(OP_POP);
+    consume(TokenType::RIGHT_PAREN, "Expect ')' after for loop increment");
+
+    emitLoop(loopStart);
+    loopStart = incrementStart;
+    patchJump(bodyJump);
+  }
+
+  statement();
+  emitLoop(loopStart);
+
+  if (exitJump != 0) {
+    patchJump(exitJump);
+    emitByte(OP_POP);
+  }
+  endScope();
 }
 
 const ParseRule Compiler::getRule(const TokenType type) const {
