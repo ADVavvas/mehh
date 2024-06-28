@@ -1,6 +1,8 @@
 #include "chunk.hpp"
+#include "value.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 void Chunk::write(uint8_t byte, size_t line) noexcept {
   code_.push_back(byte);

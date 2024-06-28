@@ -1,8 +1,11 @@
 #include "compiler.hpp"
+#include "box.hpp"
 #include "chunk.hpp"
 #include "common.hpp"
+#include "function.hpp"
 #include "precedence.hpp"
 #include "token.hpp"
+#include "value.hpp"
 #include <_types/_uint8_t.h>
 #include <cstddef>
 #include <cstdint>
@@ -14,22 +17,23 @@
 #include "debug.hpp"
 #endif
 
-const std::optional<Chunk>
+const std::optional<box<Function>>
 Compiler::compile(const std::string_view source) noexcept {
   scanner.init(source);
-  Chunk chunk{};
-  compilingChunk = &chunk;
+  Function function{};
+  this->function = &function;
 
   parser.hadError = false;
   parser.panicMode = false;
 
+  locals.push_back(Local{Token{}, 0});
   advance();
   while (!match(TokenType::END_OF_FILE)) {
     declaration();
   }
   endCompiler();
   if (!parser.hadError) {
-    return std::make_optional(chunk);
+    return std::make_optional(function);
   }
   return std::nullopt;
 }
@@ -57,7 +61,7 @@ void Compiler::synchronize() {
   }
 }
 
-Chunk &Compiler::currentChunk() const noexcept { return *compilingChunk; }
+Chunk &Compiler::currentChunk() const noexcept { return function->chunk; }
 
 [[nodiscard]] inline bool Compiler::check(const TokenType type) noexcept {
   return parser.current.type == type;
@@ -123,7 +127,8 @@ void Compiler::endCompiler() noexcept {
   emitReturn();
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-    disassembleChunk(currentChunk(), "code");
+    disassembleChunk(currentChunk(),
+                     function->name.empty() ? "<script>" : function->name);
   }
 #endif
 }

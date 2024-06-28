@@ -1,15 +1,21 @@
 #pragma once
 #include "chunk.hpp"
 #include "compiler.hpp"
+#include "function.hpp"
 #include "string_intern.hpp"
+#include "call_frame.hpp"
+#include "value.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <fmt/core.h>
 #include <iostream>
-#include <set>
 #include <string_view>
+#include <unordered_map>
 #include <variant>
+#include <vector>
 
-#define STACK_MAX 256
+#define FRAME_MAX 64
+#define STACK_MAX 256 // Can overflow
 
 enum InterpretResult {
   INTERPRET_OK,
@@ -29,20 +35,18 @@ private:
   Compiler compiler;
   std::vector<uint8_t>::const_iterator ip;
   std::vector<Value> stack;
+  std::vector<CallFrame> frames;
   std::unordered_map<std::string_view, Value> globals;
 
-  [[nodiscard]] inline const uint8_t readByte();
-  [[nodiscard]] inline const uint16_t readShort();
-  [[nodiscard]] inline const Value readConstant();
   [[nodiscard]] inline const bool isFalsey(const Value &val);
   [[nodiscard]] inline const bool valuesEqual(const Value &a, const Value &b);
   template <typename... Args>
   void runtimeError(const std::string_view format, Args &&...args) {
 
     std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
+    CallFrame &frame = frames.back();
 
-    size_t instruction = ip - chunk->getCode().begin() - 1;
-    size_t line = chunk->getLine(instruction);
+    size_t line = frame.function.chunk.getLine(frame.ip());
     std::cout << fmt::format("[line {}] in script\n", line);
   }
 

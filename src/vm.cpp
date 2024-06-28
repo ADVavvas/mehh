@@ -1,27 +1,25 @@
 #include "vm.hpp"
+#include "box.hpp"
+#include "call_frame.hpp"
 #include "chunk.hpp"
 #include "common.hpp"
 #include "compiler.hpp"
 #include "debug.hpp"
+#include "function.hpp"
 #include "value.hpp"
+#include "value_array.hpp"
 #include <_types/_uint8_t.h>
+#include <cstdint>
 #include <iostream>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
-VM::VM() noexcept : compiler(Compiler{stringIntern}) {
+VM::VM() noexcept
+    : compiler(Compiler{stringIntern, FunctionType::TYPE_SCRIPT}) {
   stack.reserve(STACK_MAX);
-}
-
-inline const uint8_t VM::readByte() { return *ip++; }
-
-inline const uint16_t VM::readShort() {
-  ip += 2;
-  return *(ip - 1) | (*(ip - 2) << 8);
-}
-
-inline const Value VM::readConstant() {
-  return chunk->getConstants().getValues()[readByte()];
 }
 
 inline const bool VM::isFalsey(const Value &val) {
@@ -44,15 +42,17 @@ inline const bool VM::valuesEqual(const Value &a, const Value &b) {
 }
 
 const InterpretResult VM::interpret(const std::string_view source) {
-  const std::optional<Chunk> &chunk = compiler.compile(source);
-  if (!chunk.has_value())
+  const std::optional<box<Function>> &function = compiler.compile(source);
+  if (!function.has_value()) {
     return INTERPRET_COMPILE_ERROR;
-  this->chunk = &chunk.value();
-  ip = this->chunk->getCode().begin();
+  }
+  stack.push_back(function.value());
+  frames.push_back(CallFrame{*function.value(), stack.begin()});
   return run();
 }
 
 const InterpretResult VM::run() {
+  CallFrame &frame = frames.back();
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     std::cout << "          ";
@@ -62,14 +62,14 @@ const InterpretResult VM::run() {
       std::cout << " ]";
     }
     std::cout << "\n";
-    disassembleInstruction(*chunk, ip - chunk->getCode().begin());
+    disassembleInstruction(frame.function.chunk, frame.getIp());
 #endif
     uint8_t instruction;
-    switch (instruction = readByte()) {
+    switch (instruction = frame.readByte()) {
     case OP_RETURN:
       return INTERPRET_OK;
     case OP_CONSTANT: {
-      const Value &constant = readConstant();
+      const Value &constant = frame.readConstant();
       stack.push_back(constant);
       // printValue(constant);
       // std::cout << "\n";
@@ -189,7 +189,7 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_DEFINE_GLOBAL: {
-      const Value &name = readConstant();
+      const Value &name = frame.readConstant();
       if (!std::holds_alternative<std::string_view>(name)) {
         break;
       }
@@ -201,7 +201,7 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_GET_GLOBAL: {
-      const Value &value = readConstant();
+      const Value &value = frame.readConstant();
       if (!std::holds_alternative<std::string_view>(value)) {
         break;
       }
@@ -215,7 +215,7 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_SET_GLOBAL: {
-      const Value &name = readConstant();
+      const Value &name = frame.readConstant();
       if (!std::holds_alternative<std::string_view>(name)) {
         break;
       }
@@ -229,31 +229,31 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_GET_LOCAL: {
-      uint8_t slot = readByte();
-      stack.push_back(stack[slot]);
+      uint8_t slot = frame.readByte();
+      stack.push_back(frame.slots[slot]);
       break;
     }
     case OP_SET_LOCAL: {
-      uint8_t slot = readByte();
-      stack[slot] = stack.back();
+      uint8_t slot = frame.readByte();
+      frame.slots[slot] = stack.back();
       break;
     }
     case OP_POP:
       stack.pop_back();
       break;
     case OP_JUMP_IF_FALSE: {
-      uint16_t offset = readShort();
+      uint16_t offset = frame.readShort();
       if (isFalsey(stack.back())) {
-        ip += offset;
+        frame.ip() += offset;
       }
       break;
     }
     case OP_JUMP:
-      ip += readShort();
+      frame.ip() += frame.readShort();
       break;
     case OP_LOOP: {
-      uint16_t offset = readShort();
-      ip -= offset;
+      uint16_t offset = frame.readShort();
+      frame.ip() -= offset;
       break;
     }
     }

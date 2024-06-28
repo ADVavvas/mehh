@@ -5,10 +5,12 @@
 #include "scanner.hpp"
 #include "string_intern.hpp"
 #include "token.hpp"
+#include "value.hpp"
 #include <_types/_uint16_t.h>
 #include <_types/_uint8_t.h>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 class Compiler;
 
@@ -30,10 +32,13 @@ struct Local {
   uint8_t depth;
 };
 
+enum class FunctionType { TYPE_FUNCTION, TYPE_SCRIPT };
+
 class Compiler {
 public:
-  explicit Compiler(StringIntern &stringIntern) : stringIntern{stringIntern} {};
-  [[nodiscard]] const std::optional<Chunk>
+  explicit Compiler(StringIntern &stringIntern, FunctionType type)
+      : stringIntern{stringIntern}, type{type} {};
+  [[nodiscard]] const std::optional<box<Function>>
   compile(const std::string_view source) noexcept;
 
 private:
@@ -41,7 +46,8 @@ private:
   StringIntern &stringIntern;
   Scanner scanner;
   Parser parser;
-  Chunk *compilingChunk;
+  Function *function;
+  FunctionType type;
   uint8_t scopeDepth;
   bool canAssign;
 

@@ -42,6 +42,9 @@ ${MEHH_SRC_DIR}/mehh.cpp
 ${MEHH_SRC_DIR}/scanner.cpp
 ${MEHH_SRC_DIR}/value.cpp
 ${MEHH_SRC_DIR}/vm.cpp
+${MEHH_SRC_DIR}/value_array.cpp
+${MEHH_SRC_DIR}/function.cpp
+${MEHH_SRC_DIR}/call_frame.cpp
 )
 
 set (MEHH_TESTS 
@@ -54,6 +57,9 @@ ${MEHH_SRC_DIR}/mehh.cpp
 ${MEHH_SRC_DIR}/scanner.cpp
 ${MEHH_SRC_DIR}/value.cpp
 ${MEHH_SRC_DIR}/vm.cpp
+${MEHH_SRC_DIR}/value_array.cpp
+${MEHH_SRC_DIR}/function.cpp
+${MEHH_SRC_DIR}/call_frame.cpp
 )
 
 add_subdirectory(external/fmt)
