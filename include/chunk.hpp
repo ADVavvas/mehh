@@ -3,7 +3,6 @@
 #include "value_array.hpp"
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
 #include <vector>
 
 enum OpCode : uint8_t {

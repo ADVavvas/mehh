@@ -15,3 +15,9 @@ print breakfast;
 
   print a;
 }
+
+fun areWeHavingFunYet() {
+  print "Yes we are";
+}
+
+print areWeHavingFunYet;

@@ -2,7 +2,7 @@
 
 #include "chunk.hpp"
 #include <cstdint>
-#include <string_view>
+#include <string>
 
 class Function {
 public:
@@ -10,5 +10,5 @@ public:
 
   uint8_t arity;
   Chunk chunk;
-  std::string_view name;
+  std::string name;
 };

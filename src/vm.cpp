@@ -6,6 +6,8 @@
 #include "compiler.hpp"
 #include "debug.hpp"
 #include "function.hpp"
+#include "parser.hpp"
+#include "scanner.hpp"
 #include "value.hpp"
 #include "value_array.hpp"
 #include <_types/_uint8_t.h>
@@ -18,7 +20,7 @@
 #include <vector>
 
 VM::VM() noexcept
-    : compiler(Compiler{stringIntern, FunctionType::TYPE_SCRIPT}) {
+    : compiler(Compiler{stringIntern}) {
   stack.reserve(STACK_MAX);
 }
 

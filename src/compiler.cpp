@@ -20,20 +20,21 @@
 const std::optional<box<Function>>
 Compiler::compile(const std::string_view source) noexcept {
   scanner.init(source);
-  Function function{};
-  this->function = &function;
+
+  FunctionCompiler global{FunctionType::TYPE_SCRIPT, nullptr, parser, scanner};
+  current = &global;
 
   parser.hadError = false;
   parser.panicMode = false;
 
-  locals.push_back(Local{Token{}, 0});
+  current->locals.push_back(Local{Token{}, 0});
   advance();
   while (!match(TokenType::END_OF_FILE)) {
     declaration();
   }
   endCompiler();
   if (!parser.hadError) {
-    return std::make_optional(function);
+    return std::make_optional(global.getFunction());
   }
   return std::nullopt;
 }
@@ -61,7 +62,7 @@ void Compiler::synchronize() {
   }
 }
 
-Chunk &Compiler::currentChunk() const noexcept { return function->chunk; }
+Chunk &Compiler::currentChunk() noexcept { return current->function().chunk; }
 
 [[nodiscard]] inline bool Compiler::check(const TokenType type) noexcept {
   return parser.current.type == type;
@@ -128,39 +129,47 @@ void Compiler::endCompiler() noexcept {
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
     disassembleChunk(currentChunk(),
-                     function->name.empty() ? "<script>" : function->name);
+                     current->getFunction().name.empty() ? "<script>" : current->getFunction().name);
   }
 #endif
+
+  if(current && current->getEnclosing()) {
+    current = current->getEnclosing();
+  }
 }
 
-void Compiler::beginScope() noexcept { scopeDepth++; }
+void Compiler::beginScope() noexcept { current->scopeDepth++; }
 
 void Compiler::endScope() noexcept {
-  scopeDepth--;
-  while (!locals.empty() && locals.back().depth > scopeDepth) {
+  current->scopeDepth--;
+  while (!current->locals.empty() && current->locals.back().depth > current->scopeDepth) {
     emitByte(OP_POP);
-    locals.pop_back();
+    current->locals.pop_back();
   }
 }
 
 void Compiler::addLocal(const Token &token) noexcept {
   // TODO: Enforce max depth.
-  locals.push_back({token, UINT8_MAX});
+  current->locals.push_back({token, UINT8_MAX});
 }
 
 uint8_t Compiler::resolveLocal(const Token &token) noexcept {
-  for (auto it = locals.rbegin(); it != locals.rend(); ++it) {
+  for (auto it = current->locals.rbegin(); it != current->locals.rend(); ++it) {
     if (it->name.lexeme == token.lexeme) {
       if (it->depth == UINT8_MAX) {
         error("Cannot read local variable in its own initializer.");
       }
-      return static_cast<uint8_t>(std::distance(it, locals.rend()) - 1);
+      return static_cast<uint8_t>(std::distance(it, current->locals.rend()) - 1);
     }
   }
   return UINT8_MAX;
 }
 
-void Compiler::markInitialized() noexcept { locals.back().depth = scopeDepth; }
+void Compiler::markInitialized() noexcept {
+  if (current->scopeDepth == 0)
+    return;
+  current->locals.back().depth = current->scopeDepth;
+}
 
 uint8_t Compiler::makeConstant(const Value &value) noexcept {
   size_t constant = currentChunk().writeConstant(value);
@@ -230,7 +239,7 @@ Compiler::parseVariable(const std::string_view errorMessage) noexcept {
   consume(TokenType::IDENTIFIER, errorMessage);
 
   declareVariable();
-  if (scopeDepth > 0) {
+  if (current->scopeDepth > 0) {
     return 0;
   }
 
@@ -243,7 +252,7 @@ const uint8_t Compiler::identifierConstant(const Token &name) noexcept {
 }
 
 void Compiler::defineVariable(uint8_t global) noexcept {
-  if (scopeDepth > 0) {
+  if (current->scopeDepth > 0) {
     markInitialized();
     return;
   }
@@ -251,13 +260,13 @@ void Compiler::defineVariable(uint8_t global) noexcept {
 }
 
 void Compiler::declareVariable() noexcept {
-  if (scopeDepth == 0) {
+  if (current->scopeDepth == 0) {
     return;
   }
 
   const Token name = parser.previous;
-  for (auto rit = locals.rbegin(); rit != locals.rend(); ++rit) {
-    if (rit->depth != UINT8_MAX && rit->depth < scopeDepth) {
+  for (auto rit = current->locals.rbegin(); rit != current->locals.rend(); ++rit) {
+    if (rit->depth != UINT8_MAX && rit->depth < current->scopeDepth) {
       break;
     }
 
@@ -427,7 +436,9 @@ void Compiler::block() noexcept {
 }
 
 void Compiler::declaration() noexcept {
-  if (match(TokenType::VAR)) {
+  if (match(TokenType::FUN)) {
+    funDeclaration();
+  } else if (match(TokenType::VAR)) {
     varDeclaration();
   } else {
     statement();
@@ -447,6 +458,36 @@ void Compiler::varDeclaration() noexcept {
   }
   consume(TokenType::SEMICOLON, "Expect ';' after variable declaration");
   defineVariable(global);
+}
+
+void Compiler::funDeclaration() noexcept {
+  uint8_t global = parseVariable("Expect function name");
+  markInitialized();
+  createFunction(FunctionType::TYPE_FUNCTION);
+  defineVariable(global);
+}
+
+void Compiler::createFunction(const FunctionType type) noexcept {
+  FunctionCompiler compiler{type, current, parser, scanner};
+  current = &compiler;
+  beginScope();
+  consume(TokenType::LEFT_PAREN, "Expect '(' after function name.");
+  if (!check(TokenType::RIGHT_PAREN)) {
+    do {
+      current->function().arity++;
+      if (current->getFunction().arity > 255) {
+        errorAtCurrent("Can't have more than 255 parameters.");
+      }
+      uint8_t constant = parseVariable("Expect parameter name.");
+      defineVariable(constant);
+    } while (match(TokenType::COMMA));
+  }
+  consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters.");
+  consume(TokenType::LEFT_BRACE, "Expect '{' before function body.");
+  block();
+
+  endCompiler();
+  emitConstant(compiler.getFunction());
 }
 
 void Compiler::statement() noexcept {

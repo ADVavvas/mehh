@@ -1,5 +1,7 @@
 #pragma once
+#include "box.hpp"
 #include "chunk.hpp"
+#include "function.hpp"
 #include "parser.hpp"
 #include "precedence.hpp"
 #include "scanner.hpp"
@@ -8,6 +10,8 @@
 #include "value.hpp"
 #include <_types/_uint16_t.h>
 #include <_types/_uint8_t.h>
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -34,25 +38,46 @@ struct Local {
 
 enum class FunctionType { TYPE_FUNCTION, TYPE_SCRIPT };
 
+class FunctionCompiler {
+public:
+  explicit FunctionCompiler(FunctionType type, FunctionCompiler *enclosing,
+                            Parser &parser, Scanner &scanner)
+      : enclosing{enclosing}, parser{parser}, scanner{scanner}, scopeDepth{0} {
+    _function.name = parser.previous.lexeme;
+  };
+
+  inline const Function getFunction() const { return _function; }
+
+  inline Function &function() { return _function; }
+
+  inline FunctionCompiler *getEnclosing() { return enclosing; }
+
+private:
+  Scanner &scanner;
+  Parser &parser;
+  Function _function;
+  FunctionCompiler *enclosing;
+
+public:
+  std::vector<Local> locals;
+  uint8_t scopeDepth;
+};
+
 class Compiler {
 public:
-  explicit Compiler(StringIntern &stringIntern, FunctionType type)
-      : stringIntern{stringIntern}, type{type} {};
+  explicit Compiler(StringIntern &stringIntern) : stringIntern{stringIntern} {};
   [[nodiscard]] const std::optional<box<Function>>
   compile(const std::string_view source) noexcept;
 
 private:
-  std::vector<Local> locals;
   StringIntern &stringIntern;
   Scanner scanner;
   Parser parser;
-  Function *function;
-  FunctionType type;
-  uint8_t scopeDepth;
   bool canAssign;
+  FunctionCompiler *current;
 
   void synchronize();
-  [[nodiscard]] Chunk &currentChunk() const noexcept;
+  [[nodiscard]] Chunk &currentChunk() noexcept;
   [[nodiscard]] inline bool check(const TokenType type) noexcept;
   [[nodiscard]] bool match(const TokenType type) noexcept;
   void advance() noexcept;
@@ -93,8 +118,10 @@ private:
   void string() noexcept;
   void variable() noexcept;
   void block() noexcept;
+  void createFunction(const FunctionType type) noexcept;
   void declaration() noexcept;
   void varDeclaration() noexcept;
+  void funDeclaration() noexcept;
   void statement() noexcept;
   void printStatement() noexcept;
   void expressionStatement() noexcept;
