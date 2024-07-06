@@ -1,6 +1,8 @@
 #include "value.hpp"
+#include "box.hpp"
 #include "function.hpp"
 #include <iostream>
+#include <string_view>
 #include <variant>
 
 void printValue(const Value &value) {
@@ -23,6 +25,9 @@ void printValue(const Value &value) {
                    }
                    std::cout << "<fn " << function->name << ">";
                  },
+                 [](const box<NativeFunction> function) {
+                   std::cout <<"<native fn>";
+                }
              },
              value);
 }

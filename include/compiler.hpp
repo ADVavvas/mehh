@@ -8,8 +8,6 @@
 #include "string_intern.hpp"
 #include "token.hpp"
 #include "value.hpp"
-#include <_types/_uint16_t.h>
-#include <_types/_uint8_t.h>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -42,11 +40,17 @@ class FunctionCompiler {
 public:
   explicit FunctionCompiler(FunctionType type, FunctionCompiler *enclosing,
                             Parser &parser, Scanner &scanner)
-      : enclosing{enclosing}, parser{parser}, scanner{scanner}, scopeDepth{0} {
+      : enclosing{enclosing}, parser{parser}, scanner{scanner},
+        scopeDepth{0}, type{type} {
+
+    // Allocate slot 0 for the function itself.
+    locals.push_back(Local{Token{}, 0});
     _function.name = parser.previous.lexeme;
   };
 
   inline const Function getFunction() const { return _function; }
+
+  inline const FunctionType getType() const { return type; }
 
   inline Function &function() { return _function; }
 
@@ -55,8 +59,9 @@ public:
 private:
   Scanner &scanner;
   Parser &parser;
-  Function _function;
   FunctionCompiler *enclosing;
+  Function _function;
+  FunctionType type;
 
 public:
   std::vector<Local> locals;
@@ -106,6 +111,8 @@ private:
   void declareVariable() noexcept;
   void namedVariable(const Token &name) noexcept;
   void patchJump(size_t offset) noexcept;
+  void createFunction(const FunctionType type) noexcept;
+  const uint8_t argumentList() noexcept;
 
   void expression() noexcept;
   void number() noexcept;
@@ -118,7 +125,7 @@ private:
   void string() noexcept;
   void variable() noexcept;
   void block() noexcept;
-  void createFunction(const FunctionType type) noexcept;
+  void call() noexcept;
   void declaration() noexcept;
   void varDeclaration() noexcept;
   void funDeclaration() noexcept;
@@ -128,48 +135,49 @@ private:
   void ifStatement() noexcept;
   void whileStatement() noexcept;
   void forStatement() noexcept;
+  void returnStatement() noexcept;
 
 public:
   constexpr static ParseRule rules[40] = {
-      {&Compiler::grouping, nullptr, Precedence::NONE},        // LEFT_PAREN
-      {nullptr, nullptr, Precedence::NONE},                    // RIGHT_PAREN
-      {nullptr, nullptr, Precedence::NONE},                    // LEFT_BRACE
-      {nullptr, nullptr, Precedence::NONE},                    // RIGHT_BRACE
-      {nullptr, nullptr, Precedence::NONE},                    // COMMA
-      {nullptr, nullptr, Precedence::NONE},                    // DOT
-      {&Compiler::unary, &Compiler::binary, Precedence::TERM}, // MINUS
-      {nullptr, &Compiler::binary, Precedence::TERM},          // PLUS
-      {nullptr, nullptr, Precedence::NONE},                    // SEMICOLON
-      {nullptr, &Compiler::binary, Precedence::FACTOR},        // SLASH
-      {nullptr, &Compiler::binary, Precedence::FACTOR},        // STAR
-      {&Compiler::unary, nullptr, Precedence::NONE},           // BANG
-      {nullptr, &Compiler::binary, Precedence::EQUALITY},      // BANG_EQUAL
-      {nullptr, nullptr, Precedence::NONE},                    // EQUAL
-      {nullptr, &Compiler::binary, Precedence::EQUALITY},      // EQUAL_EQUAL
-      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // GREATER
-      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // GREATER_EQUAL
-      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS
-      {nullptr, &Compiler::binary, Precedence::COMPARISON},    // LESS_EQUAL
-      {&Compiler::variable, nullptr, Precedence::NONE},        // IDENTIFIER
-      {&Compiler::string, nullptr, Precedence::NONE},          // STRING
-      {&Compiler::number, nullptr, Precedence::NONE},          // NUMBER
-      {nullptr, &Compiler::and_, Precedence::AND},             // AND
-      {nullptr, nullptr, Precedence::NONE},                    // CLASS
-      {nullptr, nullptr, Precedence::NONE},                    // ELSE
-      {&Compiler::literal, nullptr, Precedence::NONE},         // FALSE
-      {nullptr, nullptr, Precedence::NONE},                    // FOR
-      {nullptr, nullptr, Precedence::NONE},                    // FUN
-      {nullptr, nullptr, Precedence::NONE},                    // IF
-      {&Compiler::literal, nullptr, Precedence::NONE},         // NIL
-      {nullptr, &Compiler::or_, Precedence::OR},               // OR
-      {nullptr, nullptr, Precedence::NONE},                    // PRINT
-      {nullptr, nullptr, Precedence::NONE},                    // RETURN
-      {nullptr, nullptr, Precedence::NONE},                    // SUPER
-      {nullptr, nullptr, Precedence::NONE},                    // THIS
-      {&Compiler::literal, nullptr, Precedence::NONE},         // TRUE
-      {nullptr, nullptr, Precedence::NONE},                    // VAR
-      {nullptr, nullptr, Precedence::NONE},                    // WHILE
-      {nullptr, nullptr, Precedence::NONE},                    // ERROR
-      {nullptr, nullptr, Precedence::NONE},                    // EOF
+      {&Compiler::grouping, &Compiler::call, Precedence::CALL}, // LEFT_PAREN
+      {nullptr, nullptr, Precedence::NONE},                     // RIGHT_PAREN
+      {nullptr, nullptr, Precedence::NONE},                     // LEFT_BRACE
+      {nullptr, nullptr, Precedence::NONE},                     // RIGHT_BRACE
+      {nullptr, nullptr, Precedence::NONE},                     // COMMA
+      {nullptr, nullptr, Precedence::NONE},                     // DOT
+      {&Compiler::unary, &Compiler::binary, Precedence::TERM},  // MINUS
+      {nullptr, &Compiler::binary, Precedence::TERM},           // PLUS
+      {nullptr, nullptr, Precedence::NONE},                     // SEMICOLON
+      {nullptr, &Compiler::binary, Precedence::FACTOR},         // SLASH
+      {nullptr, &Compiler::binary, Precedence::FACTOR},         // STAR
+      {&Compiler::unary, nullptr, Precedence::NONE},            // BANG
+      {nullptr, &Compiler::binary, Precedence::EQUALITY},       // BANG_EQUAL
+      {nullptr, nullptr, Precedence::NONE},                     // EQUAL
+      {nullptr, &Compiler::binary, Precedence::EQUALITY},       // EQUAL_EQUAL
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},     // GREATER
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},     // GREATER_EQUAL
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},     // LESS
+      {nullptr, &Compiler::binary, Precedence::COMPARISON},     // LESS_EQUAL
+      {&Compiler::variable, nullptr, Precedence::NONE},         // IDENTIFIER
+      {&Compiler::string, nullptr, Precedence::NONE},           // STRING
+      {&Compiler::number, nullptr, Precedence::NONE},           // NUMBER
+      {nullptr, &Compiler::and_, Precedence::AND},              // AND
+      {nullptr, nullptr, Precedence::NONE},                     // CLASS
+      {nullptr, nullptr, Precedence::NONE},                     // ELSE
+      {&Compiler::literal, nullptr, Precedence::NONE},          // FALSE
+      {nullptr, nullptr, Precedence::NONE},                     // FOR
+      {nullptr, nullptr, Precedence::NONE},                     // FUN
+      {nullptr, nullptr, Precedence::NONE},                     // IF
+      {&Compiler::literal, nullptr, Precedence::NONE},          // NIL
+      {nullptr, &Compiler::or_, Precedence::OR},                // OR
+      {nullptr, nullptr, Precedence::NONE},                     // PRINT
+      {nullptr, nullptr, Precedence::NONE},                     // RETURN
+      {nullptr, nullptr, Precedence::NONE},                     // SUPER
+      {nullptr, nullptr, Precedence::NONE},                     // THIS
+      {&Compiler::literal, nullptr, Precedence::NONE},          // TRUE
+      {nullptr, nullptr, Precedence::NONE},                     // VAR
+      {nullptr, nullptr, Precedence::NONE},                     // WHILE
+      {nullptr, nullptr, Precedence::NONE},                     // ERROR
+      {nullptr, nullptr, Precedence::NONE},                     // EOF
   };
 };

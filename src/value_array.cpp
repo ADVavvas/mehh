@@ -1,5 +1,5 @@
 #include "value_array.hpp"
-#include "function.hpp"
+#include "function.hpp" // Required for function to be fully defined - only fwd decl is in value.hpp
 #include "value.hpp"
 #include <cstddef>
 #include <vector>

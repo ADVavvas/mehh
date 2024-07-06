@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <sys/types.h>
 #ifdef DEBUG_PRINT_CODE
 #include "debug.hpp"
 #endif
@@ -27,7 +28,6 @@ Compiler::compile(const std::string_view source) noexcept {
   parser.hadError = false;
   parser.panicMode = false;
 
-  current->locals.push_back(Local{Token{}, 0});
   advance();
   while (!match(TokenType::END_OF_FILE)) {
     declaration();
@@ -128,12 +128,13 @@ void Compiler::endCompiler() noexcept {
   emitReturn();
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-    disassembleChunk(currentChunk(),
-                     current->getFunction().name.empty() ? "<script>" : current->getFunction().name);
+    disassembleChunk(currentChunk(), current->getFunction().name.empty()
+                                         ? "<script>"
+                                         : current->getFunction().name);
   }
 #endif
 
-  if(current && current->getEnclosing()) {
+  if (current && current->getEnclosing()) {
     current = current->getEnclosing();
   }
 }
@@ -142,7 +143,8 @@ void Compiler::beginScope() noexcept { current->scopeDepth++; }
 
 void Compiler::endScope() noexcept {
   current->scopeDepth--;
-  while (!current->locals.empty() && current->locals.back().depth > current->scopeDepth) {
+  while (!current->locals.empty() &&
+         current->locals.back().depth > current->scopeDepth) {
     emitByte(OP_POP);
     current->locals.pop_back();
   }
@@ -159,7 +161,8 @@ uint8_t Compiler::resolveLocal(const Token &token) noexcept {
       if (it->depth == UINT8_MAX) {
         error("Cannot read local variable in its own initializer.");
       }
-      return static_cast<uint8_t>(std::distance(it, current->locals.rend()) - 1);
+      return static_cast<uint8_t>(std::distance(it, current->locals.rend()) -
+                                  1);
     }
   }
   return UINT8_MAX;
@@ -189,7 +192,10 @@ void Compiler::emitBytes(uint8_t byte1, uint8_t byte2) noexcept {
   emitByte(byte2);
 }
 
-void Compiler::emitReturn() noexcept { emitByte(OpCode::OP_RETURN); }
+void Compiler::emitReturn() noexcept {
+  emitByte(OpCode::OP_NIL);
+  emitByte(OpCode::OP_RETURN);
+}
 
 void Compiler::emitConstant(const Value &value) noexcept {
   emitBytes(OpCode::OP_CONSTANT, makeConstant(value));
@@ -265,7 +271,8 @@ void Compiler::declareVariable() noexcept {
   }
 
   const Token name = parser.previous;
-  for (auto rit = current->locals.rbegin(); rit != current->locals.rend(); ++rit) {
+  for (auto rit = current->locals.rbegin(); rit != current->locals.rend();
+       ++rit) {
     if (rit->depth != UINT8_MAX && rit->depth < current->scopeDepth) {
       break;
     }
@@ -304,6 +311,44 @@ void Compiler::patchJump(size_t offset) noexcept {
   }
   currentChunk().code()[offset] = (jump >> 8) & 0xff;
   currentChunk().code()[offset + 1] = jump & 0xff;
+}
+
+void Compiler::createFunction(const FunctionType type) noexcept {
+  FunctionCompiler compiler{type, current, parser, scanner};
+  current = &compiler;
+  beginScope();
+  consume(TokenType::LEFT_PAREN, "Expect '(' after function name.");
+  if (!check(TokenType::RIGHT_PAREN)) {
+    do {
+      current->function().arity++;
+      if (current->getFunction().arity > 255) {
+        errorAtCurrent("Can't have more than 255 parameters.");
+      }
+      uint8_t constant = parseVariable("Expect parameter name.");
+      defineVariable(constant);
+    } while (match(TokenType::COMMA));
+  }
+  consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters.");
+  consume(TokenType::LEFT_BRACE, "Expect '{' before function body.");
+  block();
+
+  endCompiler();
+  emitConstant(compiler.getFunction());
+}
+
+const uint8_t Compiler::argumentList() noexcept {
+  uint8_t argCount = 0;
+  if (!check(TokenType::RIGHT_PAREN)) {
+    do {
+      expression();
+      if (argCount == UINT8_MAX) {
+        error("Can't have more than 255 arguments.");
+      }
+      argCount++;
+    } while (match(TokenType::COMMA));
+  }
+  consume(TokenType::RIGHT_PAREN, "Expect ')' after arguments.");
+  return argCount;
 }
 
 void Compiler::expression() noexcept {
@@ -448,6 +493,11 @@ void Compiler::declaration() noexcept {
   }
 }
 
+void Compiler::call() noexcept {
+  uint8_t argCount = argumentList();
+  emitBytes(OpCode::OP_CALL, argCount);
+}
+
 void Compiler::varDeclaration() noexcept {
   uint8_t global = parseVariable("Expect variable name.");
 
@@ -467,29 +517,6 @@ void Compiler::funDeclaration() noexcept {
   defineVariable(global);
 }
 
-void Compiler::createFunction(const FunctionType type) noexcept {
-  FunctionCompiler compiler{type, current, parser, scanner};
-  current = &compiler;
-  beginScope();
-  consume(TokenType::LEFT_PAREN, "Expect '(' after function name.");
-  if (!check(TokenType::RIGHT_PAREN)) {
-    do {
-      current->function().arity++;
-      if (current->getFunction().arity > 255) {
-        errorAtCurrent("Can't have more than 255 parameters.");
-      }
-      uint8_t constant = parseVariable("Expect parameter name.");
-      defineVariable(constant);
-    } while (match(TokenType::COMMA));
-  }
-  consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters.");
-  consume(TokenType::LEFT_BRACE, "Expect '{' before function body.");
-  block();
-
-  endCompiler();
-  emitConstant(compiler.getFunction());
-}
-
 void Compiler::statement() noexcept {
   if (match(TokenType::PRINT)) {
     printStatement();
@@ -503,6 +530,8 @@ void Compiler::statement() noexcept {
     endScope();
   } else if (match(TokenType::IF)) {
     ifStatement();
+  } else if (match(TokenType::RETURN)) {
+    returnStatement();
   } else {
     expressionStatement();
   }
@@ -594,6 +623,19 @@ void Compiler::forStatement() noexcept {
     emitByte(OP_POP);
   }
   endScope();
+}
+
+void Compiler::returnStatement() noexcept {
+  if (current->getType() == FunctionType::TYPE_SCRIPT) {
+    error("Can't return from top level code");
+  }
+  if (match(TokenType::SEMICOLON)) {
+    emitReturn();
+  } else {
+    expression();
+    consume(TokenType::SEMICOLON, "Expect ';' after return value.");
+    emitByte(OpCode::OP_RETURN);
+  }
 }
 
 const ParseRule Compiler::getRule(const TokenType type) const {

@@ -1,10 +1,12 @@
 #include "debug.hpp"
 #include "chunk.hpp"
+#include "value_array.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <fmt/core.h>
-#include <format>
 #include <iomanip>
 #include <iostream>
+#include <string_view>
 
 void disassembleChunk(const Chunk &chunk, const std::string_view name) {
   std::cout << fmt::format("== {} ==\n", name);
@@ -77,6 +79,8 @@ size_t disassembleInstruction(const Chunk &chunk, size_t offset) {
     return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
   case OP_LOOP:
     return jumpInstruction("OP_LOOP", -1, chunk, offset);
+  case OP_CALL:
+    return byteInstruction("OP_CALL", chunk, offset);
   default:
     std::cout << "Unknown opcode: " << instruction;
     return offset;
@@ -100,7 +104,7 @@ size_t constantInstruction(const std::string_view name, const Chunk &chunk,
 size_t byteInstruction(const std::string_view name, const Chunk &chunk,
                        size_t offset) {
   uint8_t slot = chunk.getCode()[offset + 1];
-  std::cout << name << " " << slot << '\'';
+  std::cout << name << " " << slot << '\n';
   return offset + 2;
 }
 

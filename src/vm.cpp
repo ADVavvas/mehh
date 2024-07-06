@@ -6,11 +6,8 @@
 #include "compiler.hpp"
 #include "debug.hpp"
 #include "function.hpp"
-#include "parser.hpp"
-#include "scanner.hpp"
 #include "value.hpp"
 #include "value_array.hpp"
-#include <_types/_uint8_t.h>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -19,9 +16,9 @@
 #include <variant>
 #include <vector>
 
-VM::VM() noexcept
-    : compiler(Compiler{stringIntern}) {
+VM::VM() noexcept : compiler(Compiler{stringIntern}) {
   stack.reserve(STACK_MAX);
+  defineNative("clock", NativeFunction{VM::clockNative});
 }
 
 inline const bool VM::isFalsey(const Value &val) {
@@ -43,18 +40,58 @@ inline const bool VM::valuesEqual(const Value &a, const Value &b) {
       a, b);
 }
 
+const bool VM::callValue(const Value &callee, const uint8_t argCount) {
+  return std::visit(overloaded{
+                        [this, argCount](const box<Function> val) {
+                          return call(val, argCount);
+                        },
+                        [this, argCount](const box<NativeFunction> val) {
+                          Value result =
+                              val->fun(argCount, stack.end() - argCount);
+                          stack.erase(stack.end() - argCount, stack.end());
+                          stack.push_back(result);
+                          return true;
+                        },
+                        [this](const auto val) {
+                          runtimeError("Can only call functions and classes");
+                          return false;
+                        },
+                    },
+                    callee);
+}
+
+const bool VM::call(const box<Function> fun, const uint8_t argCount) {
+  if (argCount != fun->arity) {
+    runtimeError("Expected {} arguments but got {}.", fun->arity, argCount);
+    return false;
+  }
+  if (frames.size() == FRAME_MAX) {
+    runtimeError("Stack overflow");
+    return false;
+  }
+  // (end - argCount - 1) accounts for the 0th slot
+  frames.push_back({*fun, stack.end() - argCount - 1});
+  return true;
+}
+
+void VM::defineNative(std::string name, NativeFunction fn) {
+  globals.insert_or_assign(stringIntern.intern(name), fn);
+}
+
 const InterpretResult VM::interpret(const std::string_view source) {
   const std::optional<box<Function>> &function = compiler.compile(source);
   if (!function.has_value()) {
     return INTERPRET_COMPILE_ERROR;
   }
   stack.push_back(function.value());
-  frames.push_back(CallFrame{*function.value(), stack.begin()});
+  if (!call(function.value(), 0)) {
+    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+  }
   return run();
 }
 
 const InterpretResult VM::run() {
-  CallFrame &frame = frames.back();
+  CallFrame *frame = &frames.back();
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     std::cout << "          ";
@@ -64,14 +101,26 @@ const InterpretResult VM::run() {
       std::cout << " ]";
     }
     std::cout << "\n";
-    disassembleInstruction(frame.function.chunk, frame.getIp());
+    disassembleInstruction(frame->function.chunk, frame->getIp());
 #endif
     uint8_t instruction;
-    switch (instruction = frame.readByte()) {
-    case OP_RETURN:
-      return INTERPRET_OK;
+    switch (instruction = frame->readByte()) {
+    case OP_RETURN: {
+      Value result = stack.back();
+      stack.pop_back();
+      frames.pop_back();
+      if (frames.size() == 0) {
+        stack.pop_back();
+        return INTERPRET_OK;
+      }
+      // Erase all the called function's stack window.
+      stack.erase(frame->slots, stack.end());
+      stack.push_back(result);
+      frame = &frames.back();
+      break;
+    }
     case OP_CONSTANT: {
-      const Value &constant = frame.readConstant();
+      const Value &constant = frame->readConstant();
       stack.push_back(constant);
       // printValue(constant);
       // std::cout << "\n";
@@ -191,7 +240,7 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_DEFINE_GLOBAL: {
-      const Value &name = frame.readConstant();
+      const Value &name = frame->readConstant();
       if (!std::holds_alternative<std::string_view>(name)) {
         break;
       }
@@ -203,7 +252,7 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_GET_GLOBAL: {
-      const Value &value = frame.readConstant();
+      const Value &value = frame->readConstant();
       if (!std::holds_alternative<std::string_view>(value)) {
         break;
       }
@@ -217,7 +266,7 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_SET_GLOBAL: {
-      const Value &name = frame.readConstant();
+      const Value &name = frame->readConstant();
       if (!std::holds_alternative<std::string_view>(name)) {
         break;
       }
@@ -231,31 +280,40 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_GET_LOCAL: {
-      uint8_t slot = frame.readByte();
-      stack.push_back(frame.slots[slot]);
+      uint8_t slot = frame->readByte();
+      stack.push_back(frame->slots[slot]);
       break;
     }
     case OP_SET_LOCAL: {
-      uint8_t slot = frame.readByte();
-      frame.slots[slot] = stack.back();
+      uint8_t slot = frame->readByte();
+      frame->slots[slot] = stack.back();
       break;
     }
     case OP_POP:
       stack.pop_back();
       break;
     case OP_JUMP_IF_FALSE: {
-      uint16_t offset = frame.readShort();
+      uint16_t offset = frame->readShort();
       if (isFalsey(stack.back())) {
-        frame.ip() += offset;
+        frame->ip() += offset;
       }
       break;
     }
     case OP_JUMP:
-      frame.ip() += frame.readShort();
+      frame->ip() += frame->readShort();
       break;
     case OP_LOOP: {
-      uint16_t offset = frame.readShort();
-      frame.ip() -= offset;
+      uint16_t offset = frame->readShort();
+      frame->ip() -= offset;
+      break;
+    }
+    case OP_CALL: {
+      uint8_t argCount = frame->readByte();
+      if (!callValue(stack[stack.size() - 1 - argCount], argCount)) {
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      frame = &frames.back();
+
       break;
     }
     }
