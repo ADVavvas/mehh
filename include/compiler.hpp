@@ -34,6 +34,11 @@ struct Local {
   uint8_t depth;
 };
 
+struct Upvalue {
+  size_t index;
+  bool isLocal;
+};
+
 enum class FunctionType { TYPE_FUNCTION, TYPE_SCRIPT };
 
 class FunctionCompiler {
@@ -65,6 +70,7 @@ private:
 
 public:
   std::vector<Local> locals;
+  std::vector<Upvalue> upvalues;
   uint8_t scopeDepth;
 };
 
@@ -94,7 +100,9 @@ private:
   void beginScope() noexcept;
   void endScope() noexcept;
   void addLocal(const Token &token) noexcept;
-  uint8_t resolveLocal(const Token &token) noexcept;
+  size_t addUpvalue(FunctionCompiler &compiler, const size_t index, const bool isLocal) noexcept;
+  uint8_t resolveLocal(FunctionCompiler &compiler, const Token &token) noexcept;
+  uint8_t resolveUpvalue(FunctionCompiler &compiler, const Token &token) noexcept;
   void markInitialized() noexcept;
   const ParseRule getRule(const TokenType type) const;
   inline uint8_t makeConstant(const Value &value) noexcept;

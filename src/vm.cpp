@@ -23,7 +23,7 @@ VM::VM() noexcept : compiler(Compiler{stringIntern}) {
 
 inline const bool VM::isFalsey(const Value &val) {
   return std::holds_alternative<nil>(val) ||
-         (std::holds_alternative<bool>(val) && std::get<bool>(val));
+         (std::holds_alternative<bool>(val) && !std::get<bool>(val));
 }
 
 inline const bool VM::valuesEqual(const Value &a, const Value &b) {
@@ -42,7 +42,7 @@ inline const bool VM::valuesEqual(const Value &a, const Value &b) {
 
 const bool VM::callValue(const Value &callee, const uint8_t argCount) {
   return std::visit(overloaded{
-                        [this, argCount](const box<Function> val) {
+                        [this, argCount](const box<Closure> val) {
                           return call(val, argCount);
                         },
                         [this, argCount](const box<NativeFunction> val) {
@@ -60,9 +60,14 @@ const bool VM::callValue(const Value &callee, const uint8_t argCount) {
                     callee);
 }
 
-const bool VM::call(const box<Function> fun, const uint8_t argCount) {
-  if (argCount != fun->arity) {
-    runtimeError("Expected {} arguments but got {}.", fun->arity, argCount);
+const UpvalueObj VM::captureUpvalue(const std::vector<Value>::iterator &local) {
+  return UpvalueObj{local};
+}
+
+const bool VM::call(const box<Closure> closure, const uint8_t argCount) {
+  if (argCount != closure->function->arity) {
+    runtimeError("Expected {} arguments but got {}.", closure->function->arity,
+                 argCount);
     return false;
   }
   if (frames.size() == FRAME_MAX) {
@@ -70,7 +75,7 @@ const bool VM::call(const box<Function> fun, const uint8_t argCount) {
     return false;
   }
   // (end - argCount - 1) accounts for the 0th slot
-  frames.push_back({*fun, stack.end() - argCount - 1});
+  frames.push_back({*closure, stack.end() - argCount - 1});
   return true;
 }
 
@@ -83,8 +88,15 @@ const InterpretResult VM::interpret(const std::string_view source) {
   if (!function.has_value()) {
     return INTERPRET_COMPILE_ERROR;
   }
-  stack.push_back(function.value());
-  if (!call(function.value(), 0)) {
+  box<Function> fun = function.value();
+  stack.push_back(fun);
+  // TODO: This ought to be refactored.
+  // Need to be careful here, because we've mixed values, references, pointers
+  // and smart pointers.
+  box<Function> &boxPtr = std::get<box<Function>>(stack.back());
+  Function *funPtr = boxPtr.get();
+  Closure closure{funPtr};
+  if (!call(closure, 0)) {
     return InterpretResult::INTERPRET_RUNTIME_ERROR;
   }
   return run();
@@ -101,7 +113,7 @@ const InterpretResult VM::run() {
       std::cout << " ]";
     }
     std::cout << "\n";
-    disassembleInstruction(frame->function.chunk, frame->getIp());
+    disassembleInstruction(frame->closure.function->chunk, frame->getIp());
 #endif
     uint8_t instruction;
     switch (instruction = frame->readByte()) {
@@ -289,6 +301,17 @@ const InterpretResult VM::run() {
       frame->slots[slot] = stack.back();
       break;
     }
+    case OP_GET_UPVALUE: {
+      uint8_t slot = frame->readByte();
+      stack.push_back(*(frame->closure.upvalues[slot].location));
+      break;
+    }
+    case OP_SET_UPVALUE: {
+      uint8_t slot = frame->readByte();
+      *(frame->closure.upvalues[slot].location) = stack.back();
+      break;
+      break;
+    }
     case OP_POP:
       stack.pop_back();
       break;
@@ -314,6 +337,26 @@ const InterpretResult VM::run() {
       }
       frame = &frames.back();
 
+      break;
+    }
+    case OP_CLOSURE: {
+      // TODO: This ought to be refactored.
+      // Need to be careful here, because we've mixed values, references,
+      // pointers and smart pointers.
+      const box<Function> &function =
+          std::get<box<Function>>(frame->readConstantRef());
+      const Function *funPtr = function.get();
+      Closure closure{funPtr};
+      for (int i = 0; i < closure.function->upvalueCount; i++) {
+        uint8_t isLocal = frame->readByte();
+        uint8_t index = frame->readByte();
+        if (isLocal) {
+          closure.upvalues.push_back(captureUpvalue(frame->slots + index));
+        } else {
+          closure.upvalues.push_back(frame->closure.upvalues[index]);
+        }
+      }
+      stack.push_back(closure);
       break;
     }
     }

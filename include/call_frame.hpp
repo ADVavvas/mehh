@@ -8,18 +8,18 @@
 
 class CallFrame {
 public:
-  CallFrame(Function function, std::vector<Value>::iterator slots);
+  CallFrame(Closure closure, std::vector<Value>::iterator slots);
 
   [[nodiscard]] size_t &ip();
   [[nodiscard]] const size_t getIp() const;
   [[nodiscard]] const uint8_t readByte();
   [[nodiscard]] const uint16_t readShort();
   [[nodiscard]] const Value readConstant();
+  [[nodiscard]] const Value &readConstantRef();
 
-  Function function;
+  Closure closure;
   std::vector<Value>::iterator slots;
 
 private:
   size_t ip_ = 0;
 };
-

@@ -6,23 +6,26 @@
 #include <cstdint>
 #include <vector>
 
-CallFrame::CallFrame(Function function, std::vector<Value>::iterator slots)
-    : function{function}, slots{slots} {};
+CallFrame::CallFrame(Closure closure, std::vector<Value>::iterator slots)
+    : closure{closure}, slots{slots} {};
 
 size_t &CallFrame::ip() { return ip_; }
 
 const size_t CallFrame::getIp() const { return ip_; }
 
 const uint8_t CallFrame::readByte() {
-  return function.chunk.getCode()[ip_++];
+  return closure.function->chunk.getCode()[ip_++];
 }
 
 const uint16_t CallFrame::readShort() {
   ip_ += 2;
-  return function.chunk.getCode()[ip_ - 1] |
-         (function.chunk.getCode()[ip_ - 2] << 8);
+  return closure.function->chunk.getCode()[ip_ - 1] |
+         (closure.function->chunk.getCode()[ip_ - 2] << 8);
 }
 
 const Value CallFrame::readConstant() {
-  return function.chunk.getConstants().getValues()[readByte()];
+  return closure.function->chunk.getConstants().getValues()[readByte()];
+}
+const Value &CallFrame::readConstantRef() {
+  return closure.function->chunk.getConstants().getValues()[readByte()];
 }

@@ -49,7 +49,8 @@ private:
   [[nodiscard]] inline const bool valuesEqual(const Value &a, const Value &b);
   [[nodiscard]] const bool callValue(const Value &callee,
                                      const uint8_t argCount);
-  [[nodiscard]] const bool call(const box<Function> fun,
+  [[nodiscard]] const UpvalueObj captureUpvalue(const std::vector<Value>::iterator &local);
+  [[nodiscard]] const bool call(const box<Closure> closure,
                                 const uint8_t argCount);
 
   void defineNative(std::string name, NativeFunction fn);
@@ -58,12 +59,12 @@ private:
 
     std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
     for (int i = frames.size() - 1; i >= 0; i--) {
-      size_t line = frames[i].function.chunk.getLine(frames[i].ip());
+      size_t line = frames[i].closure.function->chunk.getLine(frames[i].ip());
       std::cout << fmt::format("[line {}] in script\n", line);
-      if (frames[i].function.name.empty()) {
+      if (frames[i].closure.function->name.empty()) {
         std::cout << "script\n";
       } else {
-        std::cout << frames[i].function.name << "\n";
+        std::cout << frames[i].closure.function->name << "\n";
       }
     }
   }

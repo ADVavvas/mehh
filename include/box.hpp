@@ -19,6 +19,8 @@ public:
 
   ~box() = default;
 
+  T *get() const { return _impl.get(); }
+
   T &operator*() { return *_impl; }
   const T &operator*() const { return *_impl; }
 

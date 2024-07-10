@@ -22,17 +22,20 @@
 // 
 // print areWeHavingFunYet;
 
-// fun fib(n) {
-//   if (n < 2) return n;
-//   return fib(n - 2) + fib(n - 1);
-// }
-// 
-// var start = clock();
-// print fib(35);
-// print clock() - start;
-
-fun test(n) {
-  return n * 2;
+fun fib(n) {
+  if (n < 2) return n;
+  return fib(n - 2) + fib(n - 1);
 }
 
-print test(10);
+var start = clock();
+print fib(31);
+print clock() - start;
+
+// fun outer() {
+//   var x = "outside";
+//   fun inner() {
+//     print x;
+//   }
+//   inner();
+// }
+// outer();

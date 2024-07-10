@@ -6,7 +6,7 @@
 #include <variant>
 
 using nil = std::monostate;
-using Value = std::variant<double, bool, nil, std::string_view, box<Function>, box<NativeFunction>>;
+using Value = std::variant<double, bool, nil, std::string_view, box<Function>, box<NativeFunction>, box<Closure>, UpvalueObj>;
 
 template <typename... Ts> struct overloaded : Ts... {
   using Ts::operator()...;

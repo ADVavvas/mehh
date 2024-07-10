@@ -1,3 +1,3 @@
 #include "function.hpp"
 
-Function::Function() : arity(0), name("") {}
+Function::Function() : arity{0}, name{""}, upvalueCount{0} {}

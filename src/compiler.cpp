@@ -10,10 +10,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <sys/types.h>
+#include <type_traits>
 #ifdef DEBUG_PRINT_CODE
 #include "debug.hpp"
 #endif
@@ -155,16 +157,50 @@ void Compiler::addLocal(const Token &token) noexcept {
   current->locals.push_back({token, UINT8_MAX});
 }
 
-uint8_t Compiler::resolveLocal(const Token &token) noexcept {
-  for (auto it = current->locals.rbegin(); it != current->locals.rend(); ++it) {
+size_t Compiler::addUpvalue(FunctionCompiler &compiler, const size_t index,
+                            const bool isLocal) noexcept {
+  size_t upvalueCount = compiler.function().upvalueCount;
+  for (int i = 0; i < upvalueCount; i++) {
+    Upvalue &upvalue = compiler.upvalues[i];
+    if (upvalue.index == index && upvalue.isLocal == isLocal) {
+      return i;
+    }
+  }
+  compiler.upvalues.push_back({index, isLocal});
+  compiler.function().upvalueCount++;
+  return upvalueCount;
+}
+
+uint8_t Compiler::resolveLocal(FunctionCompiler &compiler,
+                               const Token &token) noexcept {
+  for (auto it = compiler.locals.rbegin(); it != compiler.locals.rend(); ++it) {
     if (it->name.lexeme == token.lexeme) {
       if (it->depth == UINT8_MAX) {
         error("Cannot read local variable in its own initializer.");
       }
-      return static_cast<uint8_t>(std::distance(it, current->locals.rend()) -
+      return static_cast<uint8_t>(std::distance(it, compiler.locals.rend()) -
                                   1);
     }
   }
+  return UINT8_MAX;
+}
+
+uint8_t Compiler::resolveUpvalue(FunctionCompiler &compiler,
+                                 const Token &token) noexcept {
+  if (compiler.getEnclosing() == nullptr)
+    return UINT8_MAX;
+
+  uint8_t local = resolveLocal(*compiler.getEnclosing(), token);
+  if (local != UINT8_MAX) {
+    return addUpvalue(compiler, local, true);
+  }
+
+  // Recursively resolve
+  uint8_t upvalue = resolveUpvalue(*compiler.getEnclosing(), token);
+  if (upvalue != UINT8_MAX) {
+    return addUpvalue(compiler, upvalue, false);
+  }
+
   return UINT8_MAX;
 }
 
@@ -286,10 +322,13 @@ void Compiler::declareVariable() noexcept {
 
 void Compiler::namedVariable(const Token &name) noexcept {
   uint8_t getOp, setOp;
-  uint8_t arg = resolveLocal(name);
+  uint8_t arg = resolveLocal(*current, name);
   if (arg != UINT8_MAX) {
     getOp = OpCode::OP_GET_LOCAL;
     setOp = OpCode::OP_SET_LOCAL;
+  } else if ((arg = resolveUpvalue(*current, name)) != UINT8_MAX) {
+    getOp = OpCode::OP_GET_UPVALUE;
+    setOp = OpCode::OP_SET_UPVALUE;
   } else {
     arg = identifierConstant(name);
     getOp = OpCode::OP_GET_GLOBAL;
@@ -333,7 +372,11 @@ void Compiler::createFunction(const FunctionType type) noexcept {
   block();
 
   endCompiler();
-  emitConstant(compiler.getFunction());
+  emitBytes(OpCode::OP_CLOSURE, makeConstant(compiler.getFunction()));
+  for (int i = 0; i < compiler.getFunction().upvalueCount; i++) {
+    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+    emitByte(compiler.upvalues[i].index);
+  }
 }
 
 const uint8_t Compiler::argumentList() noexcept {
