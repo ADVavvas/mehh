@@ -1,4 +1,5 @@
 #include "vm.hpp"
+#include "Tracy.hpp"
 #include "box.hpp"
 #include "call_frame.hpp"
 #include "chunk.hpp"
@@ -103,6 +104,7 @@ const InterpretResult VM::interpret(const std::string_view source) {
 }
 
 const InterpretResult VM::run() {
+  ZoneScopedNC("VM run", 0x00FFFF);
   CallFrame *frame = &frames.back();
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -118,24 +120,29 @@ const InterpretResult VM::run() {
     uint8_t instruction;
     switch (instruction = frame->readByte()) {
     case OP_RETURN: {
+      ZoneScopedNC("RETURN", tracy::Color::Yellow);
       Value result = stack.back();
       stack.pop_back();
       frames.pop_back();
       if (frames.size() == 0) {
         stack.pop_back();
         return INTERPRET_OK;
+        FrameMark;
       }
       // Erase all the called function's stack window.
       stack.erase(frame->slots, stack.end());
       stack.push_back(result);
       frame = &frames.back();
+      FrameMark;
       break;
     }
     case OP_CONSTANT: {
+      ZoneScopedNC("CONSTANT", tracy::Color::Burlywood);
       const Value &constant = frame->readConstant();
       stack.push_back(constant);
       // printValue(constant);
       // std::cout << "\n";
+      FrameMark;
     } break;
     case OP_NIL:
       stack.push_back(nil{});
@@ -155,6 +162,7 @@ const InterpretResult VM::run() {
       val = -std::get<double>(val);
     } break;
     case OP_ADD: {
+      ZoneScopedNC("ADD", tracy::Color::Brown);
       if (stack.size() < 2) {
         return INTERPRET_RUNTIME_ERROR;
       }
@@ -190,17 +198,27 @@ const InterpretResult VM::run() {
               },
           },
           a, b);
+      FrameMark;
       if (success) {
         break;
       }
       return INTERPRET_RUNTIME_ERROR;
     }
     case OP_SUBTRACT: {
-      auto res = binary_op([](double a, double b) constexpr { return a - b; });
-      if (res == INTERPRET_RUNTIME_ERROR) {
+      ZoneScopedNC("SUB", tracy::Color::Crimson);
 
-        return res;
+      if (stack.size() < 2 ||
+          !std::holds_alternative<double>(*(stack.end() - 1)) ||
+          !std::holds_alternative<double>(*(stack.end() - 2))) {
+        runtimeError("Operands must be numbers");
+        return INTERPRET_RUNTIME_ERROR;
       }
+      double b = std::get<double>(stack.back());
+      stack.pop_back();
+      double a = std::get<double>(stack.back());
+      stack.pop_back();
+      stack.push_back(a - b);
+      FrameMark;
       break;
     }
     case OP_MULTIPLY: {
@@ -239,7 +257,9 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_LESS: {
+      ZoneScopedNC("LESS", tracy::Color::Yellow);
       auto res = binary_op([](double a, double b) constexpr { return a < b; });
+      FrameMark;
       if (res == INTERPRET_RUNTIME_ERROR) {
         return res;
       }
@@ -292,13 +312,17 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_GET_LOCAL: {
+      ZoneScopedNC("GET LOCAL", tracy::Color::Pink);
       uint8_t slot = frame->readByte();
       stack.push_back(frame->slots[slot]);
+      FrameMark;
       break;
     }
     case OP_SET_LOCAL: {
+      ZoneScopedNC("SET LOCAL", tracy::Color::Pink);
       uint8_t slot = frame->readByte();
       frame->slots[slot] = stack.back();
+      FrameMark;
       break;
     }
     case OP_GET_UPVALUE: {
@@ -312,14 +336,19 @@ const InterpretResult VM::run() {
       break;
       break;
     }
-    case OP_POP:
+    case OP_POP: {
+      ZoneScopedNC("POP", tracy::Color::CadetBlue);
       stack.pop_back();
+      FrameMark;
       break;
+    }
     case OP_JUMP_IF_FALSE: {
+      ZoneScopedNC("JUMP", tracy::Color::Black);
       uint16_t offset = frame->readShort();
       if (isFalsey(stack.back())) {
         frame->ip() += offset;
       }
+      FrameMark;
       break;
     }
     case OP_JUMP:
@@ -331,15 +360,18 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_CALL: {
+      ZoneScopedNC("call", tracy::Color::Orange);
       uint8_t argCount = frame->readByte();
       if (!callValue(stack[stack.size() - 1 - argCount], argCount)) {
         return INTERPRET_RUNTIME_ERROR;
       }
       frame = &frames.back();
 
+      FrameMark;
       break;
     }
     case OP_CLOSURE: {
+      ZoneScopedNC("closure", tracy::Color::Orange);
       // TODO: This ought to be refactored.
       // Need to be careful here, because we've mixed values, references,
       // pointers and smart pointers.
@@ -357,9 +389,11 @@ const InterpretResult VM::run() {
         }
       }
       stack.push_back(closure);
+      FrameMark;
       break;
     }
     }
   }
+  FrameMark;
   return INTERPRET_COMPILE_ERROR;
 };

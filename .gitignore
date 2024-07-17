@@ -48,3 +48,6 @@ _deps
 *.exe
 *.out
 *.app
+
+# Tracy logs
+tracy_logs/

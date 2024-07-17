@@ -1,4 +1,5 @@
 #include "compiler.hpp"
+#include "Tracy.hpp"
 #include "box.hpp"
 #include "chunk.hpp"
 #include "common.hpp"
@@ -19,9 +20,12 @@
 #ifdef DEBUG_PRINT_CODE
 #include "debug.hpp"
 #endif
+#undef TRUE
+#undef FALSE
 
 const std::optional<box<Function>>
 Compiler::compile(const std::string_view source) noexcept {
+  ZoneScopedNC("compiler", 0xff0000);
   scanner.init(source);
 
   FunctionCompiler global{FunctionType::TYPE_SCRIPT, nullptr, parser, scanner};

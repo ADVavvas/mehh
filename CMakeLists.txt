@@ -19,21 +19,21 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 # Tracy (consider using CMake like GTest)
-# add_compile_definitions(TRACY_ENABLE)
-# set(TRACY_SRC_DIR
-# ${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public
-# )
+add_compile_definitions(TRACY_ENABLE)
+set(TRACY_SRC_DIR
+${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public
+)
 
-# set(TRACY_INC
-# ${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public/tracy
-# )
+set(TRACY_INC
+${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public/tracy
+)
 
 set (MEHH_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set (MEHH_INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set (MEHH_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/tests)
 
 set (MEHH_SRC 
-# ${TRACY_SRC_DIR}/TracyClient.cpp
+${TRACY_SRC_DIR}/TracyClient.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
 ${MEHH_SRC_DIR}/compiler.cpp
 ${MEHH_SRC_DIR}/debug.cpp
@@ -48,6 +48,7 @@ ${MEHH_SRC_DIR}/call_frame.cpp
 )
 
 set (MEHH_TESTS 
+${TRACY_SRC_DIR}/TracyClient.cpp
 ${MEHH_TESTS_DIR}/test.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
 ${MEHH_SRC_DIR}/compiler.cpp

@@ -1,4 +1,5 @@
 #include "call_frame.hpp"
+#include "Tracy.hpp"
 #include "chunk.hpp"
 #include "function.hpp"
 #include "value.hpp"
@@ -24,7 +25,9 @@ const uint16_t CallFrame::readShort() {
 }
 
 const Value CallFrame::readConstant() {
+  ZoneScopedN("readConstant");
   return closure.function->chunk.getConstants().getValues()[readByte()];
+  FrameMark;
 }
 const Value &CallFrame::readConstantRef() {
   return closure.function->chunk.getConstants().getValues()[readByte()];

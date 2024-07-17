@@ -12,10 +12,10 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <time.h>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <time.h>
 
 #define FRAME_MAX 64
 #define STACK_MAX 256 // Can overflow
@@ -49,7 +49,8 @@ private:
   [[nodiscard]] inline const bool valuesEqual(const Value &a, const Value &b);
   [[nodiscard]] const bool callValue(const Value &callee,
                                      const uint8_t argCount);
-  [[nodiscard]] const UpvalueObj captureUpvalue(const std::vector<Value>::iterator &local);
+  [[nodiscard]] const UpvalueObj
+  captureUpvalue(const std::vector<Value>::iterator &local);
   [[nodiscard]] const bool call(const box<Closure> closure,
                                 const uint8_t argCount);
 
