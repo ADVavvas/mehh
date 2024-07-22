@@ -1,6 +1,5 @@
 #include "vm.hpp"
 #include "Tracy.hpp"
-#include "box.hpp"
 #include "call_frame.hpp"
 #include "chunk.hpp"
 #include "common.hpp"
@@ -43,12 +42,15 @@ inline const bool VM::valuesEqual(const Value &a, const Value &b) {
 
 const bool VM::callValue(const Value &callee, const uint8_t argCount) {
   return std::visit(overloaded{
-                        [this, argCount](const box<Closure> val) {
-                          return call(val, argCount);
+                        [this, argCount](const Closure val) {
+                          ZoneScopedN("std::function");
+                          bool res = call(val, argCount);
+                          FrameMark;
+                          return res;
                         },
-                        [this, argCount](const box<NativeFunction> val) {
+                        [this, argCount](const NativeFunction val) {
                           Value result =
-                              val->fun(argCount, stack.end() - argCount);
+                              val.fun(argCount, stack.end() - argCount);
                           stack.erase(stack.end() - argCount, stack.end());
                           stack.push_back(result);
                           return true;
@@ -65,9 +67,9 @@ const UpvalueObj VM::captureUpvalue(const std::vector<Value>::iterator &local) {
   return UpvalueObj{local};
 }
 
-const bool VM::call(const box<Closure> closure, const uint8_t argCount) {
-  if (argCount != closure->function->arity) {
-    runtimeError("Expected {} arguments but got {}.", closure->function->arity,
+const bool VM::call(const Closure closure, const uint8_t argCount) {
+  if (argCount != closure.function->arity) {
+    runtimeError("Expected {} arguments but got {}.", closure.function->arity,
                  argCount);
     return false;
   }
@@ -76,7 +78,7 @@ const bool VM::call(const box<Closure> closure, const uint8_t argCount) {
     return false;
   }
   // (end - argCount - 1) accounts for the 0th slot
-  frames.push_back({*closure, stack.end() - argCount - 1});
+  frames.push_back({closure, stack.end() - argCount - 1});
   return true;
 }
 
@@ -85,17 +87,16 @@ void VM::defineNative(std::string name, NativeFunction fn) {
 }
 
 const InterpretResult VM::interpret(const std::string_view source) {
-  const std::optional<box<Function>> &function = compiler.compile(source);
+  const std::optional<Function> &function = compiler.compile(source);
   if (!function.has_value()) {
     return INTERPRET_COMPILE_ERROR;
   }
-  box<Function> fun = function.value();
+  Function fun = function.value();
   stack.push_back(fun);
   // TODO: This ought to be refactored.
   // Need to be careful here, because we've mixed values, references, pointers
   // and smart pointers.
-  box<Function> &boxPtr = std::get<box<Function>>(stack.back());
-  Function *funPtr = boxPtr.get();
+  Function *funPtr = &std::get<Function>(stack.back());
   Closure closure{funPtr};
   if (!call(closure, 0)) {
     return InterpretResult::INTERPRET_RUNTIME_ERROR;
@@ -106,6 +107,7 @@ const InterpretResult VM::interpret(const std::string_view source) {
 const InterpretResult VM::run() {
   ZoneScopedNC("VM run", 0x00FFFF);
   CallFrame *frame = &frames.back();
+  uint32_t numInstructions = 0;
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     std::cout << "          ";
@@ -115,8 +117,9 @@ const InterpretResult VM::run() {
       std::cout << " ]";
     }
     std::cout << "\n";
-    disassembleInstruction(frame->closure.function->chunk, frame->getIp());
+    disassembleInstruction(*(frame->closure.function->chunk), frame->getIp());
 #endif
+    numInstructions++;
     uint8_t instruction;
     switch (instruction = frame->readByte()) {
     case OP_RETURN: {
@@ -126,6 +129,7 @@ const InterpretResult VM::run() {
       frames.pop_back();
       if (frames.size() == 0) {
         stack.pop_back();
+        std::cout << "Instructions: " << numInstructions << '\n';
         return INTERPRET_OK;
         FrameMark;
       }
@@ -375,9 +379,7 @@ const InterpretResult VM::run() {
       // TODO: This ought to be refactored.
       // Need to be careful here, because we've mixed values, references,
       // pointers and smart pointers.
-      const box<Function> &function =
-          std::get<box<Function>>(frame->readConstantRef());
-      const Function *funPtr = function.get();
+      const Function *funPtr = &std::get<Function>(frame->readConstantRef());
       Closure closure{funPtr};
       for (int i = 0; i < closure.function->upvalueCount; i++) {
         uint8_t isLocal = frame->readByte();

@@ -54,7 +54,7 @@ public:
   [[nodiscard]] const size_t count() const noexcept;
 
 private:
+  ValueArray constants;
   std::vector<uint8_t> code_;
   std::vector<Line> lines;
-  ValueArray constants;
 };

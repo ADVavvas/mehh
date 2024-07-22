@@ -1,5 +1,4 @@
 #include "debug.hpp"
-#include "box.hpp"
 #include "chunk.hpp"
 #include "function.hpp"
 #include "value_array.hpp"
@@ -88,20 +87,22 @@ size_t disassembleInstruction(const Chunk &chunk, size_t offset) {
   case OP_CALL:
     return byteInstruction("OP_CALL", chunk, offset);
   case OP_CLOSURE: {
-      offset++;
-      uint8_t constant = chunk.getCode()[offset++];
-      std::cout<< "OP_CLOSURE " << constant;
-      printValue(chunk.getConstants().getValues()[constant]);
-      std::cout<<"\n";
-      box<Function> fun = std::get<box<Function>>(chunk.getConstants().getValues()[constant]);
-      for (int j = 0; j < fun->upvalueCount; j++) {
-        int isLocal = chunk.getCode()[offset++];
-        int index = chunk.getCode()[offset++];
+    offset++;
+    uint8_t constant = chunk.getCode()[offset++];
+    std::cout << "OP_CLOSURE " << constant;
+    printValue(chunk.getConstants().getValues()[constant]);
+    std::cout << "\n";
+    Function function =
+        std::get<Function>(chunk.getConstants().getValues()[constant]);
+    for (int j = 0; j < function.upvalueCount; j++) {
+      int isLocal = chunk.getCode()[offset++];
+      int index = chunk.getCode()[offset++];
 
-        std::cout << std::setfill('0') << std::right << std::setw(4) << offset - 2 << ' ';
-        std::cout<< (isLocal ? "local" : "upvalue") << " " << index;
-      }
-      return offset;
+      std::cout << std::setfill('0') << std::right << std::setw(4) << offset - 2
+                << ' ';
+      std::cout << (isLocal ? "local" : "upvalue") << " " << index;
+    }
+    return offset;
   }
   default:
     std::cout << "Unknown opcode: " << instruction;

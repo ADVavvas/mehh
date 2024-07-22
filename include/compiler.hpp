@@ -1,5 +1,4 @@
 #pragma once
-#include "box.hpp"
 #include "chunk.hpp"
 #include "function.hpp"
 #include "parser.hpp"
@@ -10,6 +9,7 @@
 #include "value.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -46,7 +46,8 @@ public:
   explicit FunctionCompiler(FunctionType type, FunctionCompiler *enclosing,
                             Parser &parser, Scanner &scanner)
       : enclosing{enclosing}, parser{parser}, scanner{scanner},
-        scopeDepth{0}, type{type} {
+        // TODO: Allocate chunk somewhere appropriate.
+        scopeDepth{0}, type{type}, _function{new Chunk()} {
 
     // Allocate slot 0 for the function itself.
     locals.push_back(Local{Token{}, 0});
@@ -77,7 +78,7 @@ public:
 class Compiler {
 public:
   explicit Compiler(StringIntern &stringIntern) : stringIntern{stringIntern} {};
-  [[nodiscard]] const std::optional<box<Function>>
+  [[nodiscard]] const std::optional<Function>
   compile(const std::string_view source) noexcept;
 
 private:
@@ -100,9 +101,11 @@ private:
   void beginScope() noexcept;
   void endScope() noexcept;
   void addLocal(const Token &token) noexcept;
-  size_t addUpvalue(FunctionCompiler &compiler, const size_t index, const bool isLocal) noexcept;
+  size_t addUpvalue(FunctionCompiler &compiler, const size_t index,
+                    const bool isLocal) noexcept;
   uint8_t resolveLocal(FunctionCompiler &compiler, const Token &token) noexcept;
-  uint8_t resolveUpvalue(FunctionCompiler &compiler, const Token &token) noexcept;
+  uint8_t resolveUpvalue(FunctionCompiler &compiler,
+                         const Token &token) noexcept;
   void markInitialized() noexcept;
   const ParseRule getRule(const TokenType type) const;
   inline uint8_t makeConstant(const Value &value) noexcept;

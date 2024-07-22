@@ -1,5 +1,4 @@
 #include "call_frame.hpp"
-#include "Tracy.hpp"
 #include "chunk.hpp"
 #include "function.hpp"
 #include "value.hpp"
@@ -8,27 +7,25 @@
 #include <vector>
 
 CallFrame::CallFrame(Closure closure, std::vector<Value>::iterator slots)
-    : closure{closure}, slots{slots} {};
+    : closure{closure}, slots{slots} {}
 
 size_t &CallFrame::ip() { return ip_; }
 
 const size_t CallFrame::getIp() const { return ip_; }
 
 const uint8_t CallFrame::readByte() {
-  return closure.function->chunk.getCode()[ip_++];
+  return closure.function->chunk->getCode()[ip_++];
 }
 
 const uint16_t CallFrame::readShort() {
   ip_ += 2;
-  return closure.function->chunk.getCode()[ip_ - 1] |
-         (closure.function->chunk.getCode()[ip_ - 2] << 8);
+  return closure.function->chunk->getCode()[ip_ - 1] |
+         (closure.function->chunk->getCode()[ip_ - 2] << 8);
 }
 
 const Value CallFrame::readConstant() {
-  ZoneScopedN("readConstant");
-  return closure.function->chunk.getConstants().getValues()[readByte()];
-  FrameMark;
+  return closure.function->chunk->getConstants().getValues()[readByte()];
 }
 const Value &CallFrame::readConstantRef() {
-  return closure.function->chunk.getConstants().getValues()[readByte()];
+  return closure.function->chunk->getConstants().getValues()[readByte()];
 }

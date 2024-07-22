@@ -19,7 +19,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 # Tracy (consider using CMake like GTest)
-add_compile_definitions(TRACY_ENABLE)
+# add_compile_definitions(TRACY_ENABLE)
 set(TRACY_SRC_DIR
 ${CMAKE_CURRENT_SOURCE_DIR}/profiling/tracy/public
 )

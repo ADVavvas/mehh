@@ -1,7 +1,4 @@
-#include "chunk.hpp"
-#include "debug.hpp"
 #include "mehh.hpp"
-#include "vm.hpp"
 #include <cstdlib>
 #include <iostream>
 

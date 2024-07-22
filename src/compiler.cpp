@@ -1,13 +1,11 @@
 #include "compiler.hpp"
 #include "Tracy.hpp"
-#include "box.hpp"
 #include "chunk.hpp"
 #include "common.hpp"
 #include "function.hpp"
 #include "precedence.hpp"
 #include "token.hpp"
 #include "value.hpp"
-#include <_types/_uint8_t.h>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -23,7 +21,7 @@
 #undef TRUE
 #undef FALSE
 
-const std::optional<box<Function>>
+const std::optional<Function>
 Compiler::compile(const std::string_view source) noexcept {
   ZoneScopedNC("compiler", 0xff0000);
   scanner.init(source);
@@ -68,7 +66,7 @@ void Compiler::synchronize() {
   }
 }
 
-Chunk &Compiler::currentChunk() noexcept { return current->function().chunk; }
+Chunk &Compiler::currentChunk() noexcept { return *current->function().chunk; }
 
 [[nodiscard]] inline bool Compiler::check(const TokenType type) noexcept {
   return parser.current.type == type;
@@ -376,7 +374,7 @@ void Compiler::createFunction(const FunctionType type) noexcept {
   block();
 
   endCompiler();
-  emitBytes(OpCode::OP_CLOSURE, makeConstant(compiler.getFunction()));
+  emitBytes(OpCode::OP_CLOSURE, makeConstant(compiler.function()));
   for (int i = 0; i < compiler.getFunction().upvalueCount; i++) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
     emitByte(compiler.upvalues[i].index);
