@@ -1,5 +1,6 @@
 #pragma once
 
+#include "boost/container/static_vector.hpp"
 #include "chunk.hpp"
 #include "function.fwd.hpp"
 #include "value.hpp"
@@ -11,9 +12,10 @@
 #include <string_view>
 #include <vector>
 
+using NativeFunctionPtr = Value (*)(int, Value *);
 class NativeFunction {
 public:
-  std::function<Value(int, std::vector<Value>::iterator)> fun;
+  NativeFunctionPtr fun;
 };
 
 class Function {
@@ -29,7 +31,7 @@ public:
 // Not to be confused with Compiler "Upvalue".
 class UpvalueObj {
 public:
-  std::vector<Value>::iterator location;
+  Value *location;
 };
 
 class Closure {

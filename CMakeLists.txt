@@ -18,6 +18,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
+set(BOOST_INCLUDE_LIBRARIES container)
+set(BOOST_ENABLE_CMAKE ON)
+
+FetchContent_Declare(
+  Boost
+  GIT_REPOSITORY https://github.com/boostorg/boost.git
+  GIT_TAG boost-1.85.0
+  GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(Boost)
+
 # Tracy (consider using CMake like GTest)
 # add_compile_definitions(TRACY_ENABLE)
 set(TRACY_SRC_DIR
@@ -74,12 +85,14 @@ target_include_directories(mehh_test PUBLIC ${MEHH_INC_DIR} ${TRACY_INC})
 target_link_libraries(
   mehh
   fmt::fmt
+  Boost::container
 )
 
 target_link_libraries(
   mehh_test
   GTest::gtest_main
   fmt::fmt
+  Boost::container
 )
 
 include(GoogleTest)

@@ -21,7 +21,7 @@
 #undef TRUE
 #undef FALSE
 
-const std::optional<Function>
+const std::optional<const Function *>
 Compiler::compile(const std::string_view source) noexcept {
   ZoneScopedNC("compiler", 0xff0000);
   scanner.init(source);
@@ -362,7 +362,7 @@ void Compiler::createFunction(const FunctionType type) noexcept {
   if (!check(TokenType::RIGHT_PAREN)) {
     do {
       current->function().arity++;
-      if (current->getFunction().arity > 255) {
+      if (current->getFunction()->arity > 255) {
         errorAtCurrent("Can't have more than 255 parameters.");
       }
       uint8_t constant = parseVariable("Expect parameter name.");
@@ -374,8 +374,8 @@ void Compiler::createFunction(const FunctionType type) noexcept {
   block();
 
   endCompiler();
-  emitBytes(OpCode::OP_CLOSURE, makeConstant(compiler.function()));
-  for (int i = 0; i < compiler.getFunction().upvalueCount; i++) {
+  emitBytes(OpCode::OP_CLOSURE, makeConstant(compiler.getFunction()));
+  for (int i = 0; i < compiler.getFunction()->upvalueCount; i++) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
     emitByte(compiler.upvalues[i].index);
   }

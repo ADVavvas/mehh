@@ -17,8 +17,8 @@
 #include <vector>
 
 VM::VM() noexcept : compiler(Compiler{stringIntern}) {
-  stack.reserve(STACK_MAX);
-  defineNative("clock", NativeFunction{VM::clockNative});
+  frames.reserve(STACK_MAX);
+  defineNative("clock", &native);
 }
 
 inline const bool VM::isFalsey(const Value &val) {
@@ -42,15 +42,15 @@ inline const bool VM::valuesEqual(const Value &a, const Value &b) {
 
 const bool VM::callValue(const Value &callee, const uint8_t argCount) {
   return std::visit(overloaded{
-                        [this, argCount](const Closure val) {
+                        [this, argCount](const Closure *val) {
                           ZoneScopedN("std::function");
                           bool res = call(val, argCount);
                           FrameMark;
                           return res;
                         },
-                        [this, argCount](const NativeFunction val) {
-                          Value result =
-                              val.fun(argCount, stack.end() - argCount);
+                        [this, argCount](const NativeFunction *val) {
+                          Value result = val->fun(
+                              argCount, stack.end().get_ptr() - argCount);
                           stack.erase(stack.end() - argCount, stack.end());
                           stack.push_back(result);
                           return true;
@@ -63,13 +63,13 @@ const bool VM::callValue(const Value &callee, const uint8_t argCount) {
                     callee);
 }
 
-const UpvalueObj VM::captureUpvalue(const std::vector<Value>::iterator &local) {
-  return UpvalueObj{local};
+const UpvalueObj VM::captureUpvalue(const StackIterator &local) {
+  return UpvalueObj{local.get_ptr()};
 }
 
-const bool VM::call(const Closure closure, const uint8_t argCount) {
-  if (argCount != closure.function->arity) {
-    runtimeError("Expected {} arguments but got {}.", closure.function->arity,
+const bool VM::call(const Closure *closure, const uint8_t argCount) {
+  if (argCount != closure->function->arity) {
+    runtimeError("Expected {} arguments but got {}.", closure->function->arity,
                  argCount);
     return false;
   }
@@ -78,27 +78,27 @@ const bool VM::call(const Closure closure, const uint8_t argCount) {
     return false;
   }
   // (end - argCount - 1) accounts for the 0th slot
-  frames.push_back({closure, stack.end() - argCount - 1});
+  frames.push_back(CallFrame{closure, stack.end() - argCount - 1});
   return true;
 }
 
-void VM::defineNative(std::string name, NativeFunction fn) {
+void VM::defineNative(std::string name, NativeFunction *fn) {
   globals.insert_or_assign(stringIntern.intern(name), fn);
 }
 
 const InterpretResult VM::interpret(const std::string_view source) {
-  const std::optional<Function> &function = compiler.compile(source);
+  const std::optional<const Function *> &function = compiler.compile(source);
   if (!function.has_value()) {
     return INTERPRET_COMPILE_ERROR;
   }
-  Function fun = function.value();
+  const Function *fun = function.value();
   stack.push_back(fun);
   // TODO: This ought to be refactored.
   // Need to be careful here, because we've mixed values, references, pointers
   // and smart pointers.
-  Function *funPtr = &std::get<Function>(stack.back());
+  const Function *funPtr = std::get<const Function *>(stack.back());
   Closure closure{funPtr};
-  if (!call(closure, 0)) {
+  if (!call(&closure, 0)) {
     return InterpretResult::INTERPRET_RUNTIME_ERROR;
   }
   return run();
@@ -130,6 +130,7 @@ const InterpretResult VM::run() {
       if (frames.size() == 0) {
         stack.pop_back();
         std::cout << "Instructions: " << numInstructions << '\n';
+        std::cout << "Stack capacity: " << stack.capacity() << '\n';
         return INTERPRET_OK;
         FrameMark;
       }
@@ -331,12 +332,12 @@ const InterpretResult VM::run() {
     }
     case OP_GET_UPVALUE: {
       uint8_t slot = frame->readByte();
-      stack.push_back(*(frame->closure.upvalues[slot].location));
+      stack.push_back(*(frame->closure->upvalues[slot].location));
       break;
     }
     case OP_SET_UPVALUE: {
       uint8_t slot = frame->readByte();
-      *(frame->closure.upvalues[slot].location) = stack.back();
+      *(frame->closure->upvalues[slot].location) = stack.back();
       break;
       break;
     }
@@ -379,7 +380,8 @@ const InterpretResult VM::run() {
       // TODO: This ought to be refactored.
       // Need to be careful here, because we've mixed values, references,
       // pointers and smart pointers.
-      const Function *funPtr = &std::get<Function>(frame->readConstantRef());
+      const Function *funPtr =
+          std::get<const Function *>(frame->readConstantRef());
       Closure closure{funPtr};
       for (int i = 0; i < closure.function->upvalueCount; i++) {
         uint8_t isLocal = frame->readByte();
@@ -387,10 +389,11 @@ const InterpretResult VM::run() {
         if (isLocal) {
           closure.upvalues.push_back(captureUpvalue(frame->slots + index));
         } else {
-          closure.upvalues.push_back(frame->closure.upvalues[index]);
+          closure.upvalues.push_back(frame->closure->upvalues[index]);
         }
       }
-      stack.push_back(closure);
+      closures.push_back(closure);
+      stack.push_back(&closures.back());
       FrameMark;
       break;
     }

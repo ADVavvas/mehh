@@ -26,7 +26,7 @@ void printValue(const Value &value) {
             std::cout << "<fn " << function.name << ">";
           },
           [](const NativeFunction function) { std::cout << "<native fn>"; },
-          [](const Closure closure) { printValue(*closure.function); },
+          [](const Closure closure) { printValue(closure.function); },
           [](const UpvalueObj upvalue) { std::cout << "upvalue"; }},
       value);
 }

@@ -2,6 +2,8 @@
 #include "vm.hpp"
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <string>
 
 void Mehh::repl() noexcept {
   std::string line;

@@ -47,18 +47,18 @@ public:
                             Parser &parser, Scanner &scanner)
       : enclosing{enclosing}, parser{parser}, scanner{scanner},
         // TODO: Allocate chunk somewhere appropriate.
-        scopeDepth{0}, type{type}, _function{new Chunk()} {
+        scopeDepth{0}, type{type}, _function{new Function(new Chunk())} {
 
     // Allocate slot 0 for the function itself.
     locals.push_back(Local{Token{}, 0});
-    _function.name = parser.previous.lexeme;
+    _function->name = parser.previous.lexeme;
   };
 
-  inline const Function getFunction() const { return _function; }
+  inline const Function *getFunction() const { return _function; }
 
   inline const FunctionType getType() const { return type; }
 
-  inline Function &function() { return _function; }
+  inline Function &function() { return *_function; }
 
   inline FunctionCompiler *getEnclosing() { return enclosing; }
 
@@ -66,7 +66,7 @@ private:
   Scanner &scanner;
   Parser &parser;
   FunctionCompiler *enclosing;
-  Function _function;
+  Function *_function;
   FunctionType type;
 
 public:
@@ -78,7 +78,7 @@ public:
 class Compiler {
 public:
   explicit Compiler(StringIntern &stringIntern) : stringIntern{stringIntern} {};
-  [[nodiscard]] const std::optional<Function>
+  [[nodiscard]] const std::optional<const Function *>
   compile(const std::string_view source) noexcept;
 
 private:

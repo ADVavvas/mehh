@@ -1,4 +1,6 @@
 #pragma once
+
+#include "boost/container/static_vector.hpp"
 #include "call_frame.hpp"
 #include "chunk.hpp"
 #include "compiler.hpp"
@@ -17,7 +19,7 @@
 #include <vector>
 
 #define FRAME_MAX 64
-#define STACK_MAX 2048
+#define STACK_MAX 256
 
 enum InterpretResult {
   INTERPRET_OK,
@@ -32,7 +34,9 @@ public:
   const InterpretResult run();
 
 private:
-  std::vector<Value> stack;
+  NativeFunction native = NativeFunction{VM::clockNative};
+  boost::container::static_vector<Closure, STACK_MAX> closures;
+  boost::container::static_vector<Value, STACK_MAX> stack;
   std::vector<CallFrame> frames;
   std::vector<uint8_t>::const_iterator ip;
   std::unordered_map<std::string_view, Value> globals;
@@ -40,7 +44,7 @@ private:
   StringIntern stringIntern;
   Compiler compiler;
 
-  static Value clockNative(int argCount, std::vector<Value>::iterator args) {
+  static Value clockNative(int argCount, Value *args) {
     return static_cast<double>(clock()) / CLOCKS_PER_SEC;
   }
 
@@ -48,22 +52,21 @@ private:
   [[nodiscard]] inline const bool valuesEqual(const Value &a, const Value &b);
   [[nodiscard]] const bool callValue(const Value &callee,
                                      const uint8_t argCount);
-  [[nodiscard]] const UpvalueObj
-  captureUpvalue(const std::vector<Value>::iterator &local);
-  [[nodiscard]] const bool call(const Closure closure, const uint8_t argCount);
+  [[nodiscard]] const UpvalueObj captureUpvalue(const StackIterator &local);
+  [[nodiscard]] const bool call(const Closure *closure, const uint8_t argCount);
 
-  void defineNative(std::string name, NativeFunction fn);
+  void defineNative(std::string name, NativeFunction *fn);
   template <typename... Args>
   void runtimeError(const std::string_view format, Args &&...args) {
 
     std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
     for (int i = frames.size() - 1; i >= 0; i--) {
-      size_t line = frames[i].closure.function->chunk->getLine(frames[i].ip());
+      size_t line = frames[i].closure->function->chunk->getLine(frames[i].ip());
       std::cout << fmt::format("[line {}] in script\n", line);
-      if (frames[i].closure.function->name.empty()) {
+      if (frames[i].closure->function->name.empty()) {
         std::cout << "script\n";
       } else {
-        std::cout << frames[i].closure.function->name << "\n";
+        std::cout << frames[i].closure->function->name << "\n";
       }
     }
   }
