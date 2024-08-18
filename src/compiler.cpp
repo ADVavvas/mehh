@@ -132,9 +132,9 @@ void Compiler::endCompiler() noexcept {
   emitReturn();
 #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-    disassembleChunk(currentChunk(), current->getFunction().name.empty()
+    disassembleChunk(currentChunk(), current->getFunction()->name.empty()
                                          ? "<script>"
-                                         : current->getFunction().name);
+                                         : current->getFunction()->name);
   }
 #endif
 

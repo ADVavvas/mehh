@@ -1,6 +1,7 @@
 #pragma once
 
 #include "boost/container/static_vector.hpp"
+#include "boost/unordered/unordered_map.hpp"
 #include "call_frame.hpp"
 #include "chunk.hpp"
 #include "compiler.hpp"
@@ -39,7 +40,7 @@ private:
   boost::container::static_vector<Value, STACK_MAX> stack;
   std::vector<CallFrame> frames;
   std::vector<uint8_t>::const_iterator ip;
-  std::unordered_map<std::string_view, Value> globals;
+  boost::unordered_map<std::string_view, Value> globals;
   const Chunk *chunk;
   StringIntern stringIntern;
   Compiler compiler;

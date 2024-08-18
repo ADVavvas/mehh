@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.5...3.21)
 project(mehh VERSION 0.1.0 LANGUAGES C CXX)
 
+set(CXXFLAGS  "-fno-rtti")
+set(CMAKE_CXX_FLAGS "${CXXFLAGS}")
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -18,7 +21,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-set(BOOST_INCLUDE_LIBRARIES container)
+set(BOOST_INCLUDE_LIBRARIES container unordered)
 set(BOOST_ENABLE_CMAKE ON)
 
 FetchContent_Declare(
@@ -79,13 +82,16 @@ add_subdirectory(external/fmt)
 add_executable(mehh ${MEHH_SRC})
 add_executable(mehh_test ${MEHH_TESTS})
 
-target_include_directories(mehh PUBLIC ${MEHH_INC_DIR} ${TRACY_INC})
-target_include_directories(mehh_test PUBLIC ${MEHH_INC_DIR} ${TRACY_INC})
+message(STATUS "Boost include dirs: ${Boost_INCLUDE_DIRS}")
+
+target_include_directories(mehh PUBLIC ${MEHH_INC_DIR} ${TRACY_INC} ${Boost_INCLUDE_DIRS})
+target_include_directories(mehh_test PUBLIC ${MEHH_INC_DIR} ${TRACY_INC} ${Boost_INCLUDE_DIRS})
 
 target_link_libraries(
   mehh
   fmt::fmt
   Boost::container
+  Boost::unordered
 )
 
 target_link_libraries(
@@ -93,6 +99,7 @@ target_link_libraries(
   GTest::gtest_main
   fmt::fmt
   Boost::container
+  Boost::unordered
 )
 
 include(GoogleTest)

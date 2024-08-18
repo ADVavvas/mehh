@@ -8,13 +8,17 @@
 #include "function.hpp"
 #include "value.hpp"
 #include "value_array.hpp"
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <optional>
+#include <stdint.h>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
+
+#define BENCHMARK
 
 VM::VM() noexcept : compiler(Compiler{stringIntern}) {
   frames.reserve(STACK_MAX);
@@ -108,6 +112,12 @@ const InterpretResult VM::run() {
   ZoneScopedNC("VM run", 0x00FFFF);
   CallFrame *frame = &frames.back();
   uint32_t numInstructions = 0;
+#ifdef BENCHMARK
+  std::array<int, OP_RETURN + 1> calls{};
+  calls.fill(0);
+  std::array<uint32_t, OP_RETURN + 1> times{};
+  times.fill(0);
+#endif
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     std::cout << "          ";
@@ -117,20 +127,30 @@ const InterpretResult VM::run() {
       std::cout << " ]";
     }
     std::cout << "\n";
-    disassembleInstruction(*(frame->closure.function->chunk), frame->getIp());
+    disassembleInstruction(*(frame->closure->function->chunk), frame->getIp());
 #endif
     numInstructions++;
     uint8_t instruction;
     switch (instruction = frame->readByte()) {
     case OP_RETURN: {
       ZoneScopedNC("RETURN", tracy::Color::Yellow);
-      Value result = stack.back();
+      Value result = std::move(stack.back());
       stack.pop_back();
       frames.pop_back();
-      if (frames.size() == 0) {
+      if (frames.empty()) {
         stack.pop_back();
         std::cout << "Instructions: " << numInstructions << '\n';
         std::cout << "Stack capacity: " << stack.capacity() << '\n';
+#ifdef BENCHMARK
+        std::cout << "SUB: " << calls[OP_SUBTRACT] << '\n';
+        std::cout << "Time SUB: " << times[OP_SUBTRACT] << '\n';
+        std::cout << "LESS: " << calls[OP_LESS] << '\n';
+        std::cout << "Time LESS: " << times[OP_LESS] << '\n';
+        std::cout << "GET GLOBAL: " << calls[OP_GET_GLOBAL] << '\n';
+        std::cout << "Time GET GLOBAL: " << times[OP_GET_GLOBAL] << '\n';
+        std::cout << "GET LOCAL: " << calls[OP_GET_LOCAL] << '\n';
+        std::cout << "Time GET LOCAL: " << times[OP_GET_LOCAL] << '\n';
+#endif
         return INTERPRET_OK;
         FrameMark;
       }
@@ -168,62 +188,74 @@ const InterpretResult VM::run() {
     } break;
     case OP_ADD: {
       ZoneScopedNC("ADD", tracy::Color::Brown);
-      if (stack.size() < 2) {
-        return INTERPRET_RUNTIME_ERROR;
-      }
+      if (__builtin_expect(stack.size() >= 2, true)) {
+        auto b = std::move(stack.back());
+        stack.pop_back();
+        auto a = std::move(stack.back());
+        stack.pop_back();
 
-      Value b = stack.back();
-      stack.pop_back();
-      Value a = stack.back();
-      stack.pop_back();
-
-      const bool success = std::visit(
-          overloaded{
-              [this](const std::monostate a, const std::monostate b) {
-                runtimeError("Operands must be two numbers or two strings.");
-                return false;
-              },
-              [this](const bool a, const bool b) {
-                runtimeError("Operands must be two numbers or two strings.");
-                return false;
-              },
-              [this](const double a, const double b) {
-                stack.push_back(a + b);
-                return true;
-              },
-              [this](const std::string_view a, const std::string_view b) {
-                std::string_view interned =
-                    stringIntern.intern(std::string{a} + std::string{b});
-                stack.push_back(interned);
-                return true;
-              },
-              [this](const auto a, const auto b) {
-                runtimeError("Operands must be two numbers or two strings.");
-                return false;
-              },
-          },
-          a, b);
-      FrameMark;
-      if (success) {
-        break;
+        const bool success = std::visit(
+            overloaded{
+                [this](const std::monostate a, const std::monostate b) {
+                  runtimeError("Operands must be two numbers or two strings.");
+                  return false;
+                },
+                [this](const bool a, const bool b) {
+                  runtimeError("Operands must be two numbers or two strings.");
+                  return false;
+                },
+                [this](const double a, const double b) {
+                  stack.push_back(a + b);
+                  return true;
+                },
+                [this](const std::string_view a, const std::string_view b) {
+                  std::string_view interned =
+                      stringIntern.intern(std::string{a} + std::string{b});
+                  stack.push_back(interned);
+                  return true;
+                },
+                [this](const auto a, const auto b) {
+                  runtimeError("Operands must be two numbers or two strings.");
+                  return false;
+                },
+            },
+            a, b);
+        FrameMark;
+        if (__builtin_expect(success, true)) {
+          break;
+        }
       }
       return INTERPRET_RUNTIME_ERROR;
     }
     case OP_SUBTRACT: {
       ZoneScopedNC("SUB", tracy::Color::Crimson);
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
 
-      if (stack.size() < 2 ||
-          !std::holds_alternative<double>(*(stack.end() - 1)) ||
-          !std::holds_alternative<double>(*(stack.end() - 2))) {
+      if (__builtin_expect(
+              stack.size() >= 2 &&
+                  std::holds_alternative<double>(*(stack.end() - 1)) &&
+                  std::holds_alternative<double>(*(stack.end() - 2)),
+              true)) {
+
+        double b = std::get<double>(stack.back());
+        stack.pop_back();
+        double a = std::get<double>(stack.back());
+        stack.pop_back();
+        stack.push_back(a - b);
+        FrameMark;
+#ifdef BENCHMARK
+        auto t2 = std::chrono::high_resolution_clock::now();
+        /* Getting number of milliseconds as an integer. */
+        auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+        times[OP_SUBTRACT] += ms_int.count();
+        calls[OP_SUBTRACT]++;
+#endif
+      } else {
         runtimeError("Operands must be numbers");
         return INTERPRET_RUNTIME_ERROR;
       }
-      double b = std::get<double>(stack.back());
-      stack.pop_back();
-      double a = std::get<double>(stack.back());
-      stack.pop_back();
-      stack.push_back(a - b);
-      FrameMark;
       break;
     }
     case OP_MULTIPLY: {
@@ -263,11 +295,41 @@ const InterpretResult VM::run() {
     }
     case OP_LESS: {
       ZoneScopedNC("LESS", tracy::Color::Yellow);
-      auto res = binary_op([](double a, double b) constexpr { return a < b; });
-      FrameMark;
-      if (res == INTERPRET_RUNTIME_ERROR) {
-        return res;
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
+      // auto res = binary_op([](double a, double b) constexpr { return a < b;
+      // });
+      if (__builtin_expect(stack.size() >= 2, true)) {
+        if (__builtin_expect(
+                std::holds_alternative<double>(*(stack.end() - 1)) &&
+                    std::holds_alternative<double>(*(stack.end() - 2)),
+                true)) {
+          double b = std::get<double>(stack.back());
+          stack.pop_back();
+          double a = std::get<double>(stack.back());
+          stack.pop_back();
+          stack.push_back(a < b);
+        } else {
+          // Handle error or other types
+          runtimeError("Operands must be numbers.");
+        }
+      } else {
+        // Handle stack underflow
+        runtimeError("Stack underflow.");
       }
+#ifdef BENCHMARK
+      auto t2 = std::chrono::high_resolution_clock::now();
+      /* Getting number of milliseconds as an integer. */
+      auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+      times[OP_LESS] += ms_int.count();
+      calls[OP_LESS]++;
+#endif
+      FrameMark;
+      // if (res != INTERPRET_RUNTIME_ERROR) {
+      //   break;
+      // }
+      // return res;
       break;
     }
     case OP_PRINT: {
@@ -289,18 +351,29 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_GET_GLOBAL: {
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
       const Value &value = frame->readConstant();
-      if (!std::holds_alternative<std::string_view>(value)) {
-        break;
+      if (std::holds_alternative<std::string_view>(value)) {
+        const auto &variable = globals.find(std::get<std::string_view>(value));
+        if (variable != globals.end()) {
+
+          stack.push_back(variable->second);
+#ifdef BENCHMARK
+          auto t2 = std::chrono::high_resolution_clock::now();
+          /* Getting number of milliseconds as an integer. */
+          auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+          times[OP_GET_GLOBAL] += ms_int.count();
+          calls[OP_GET_GLOBAL]++;
+#endif
+          break;
+        } else {
+          runtimeError("Undefined variable '{}.'",
+                       std::get<std::string_view>(value));
+          return INTERPRET_RUNTIME_ERROR;
+        }
       }
-      const auto &variable = globals.find(std::get<std::string_view>(value));
-      if (variable == globals.end()) {
-        runtimeError("Undefined variable '{}.'",
-                     std::get<std::string_view>(value));
-        return INTERPRET_RUNTIME_ERROR;
-      }
-      stack.push_back(variable->second);
-      break;
     }
     case OP_SET_GLOBAL: {
       const Value &name = frame->readConstant();
@@ -318,9 +391,19 @@ const InterpretResult VM::run() {
     }
     case OP_GET_LOCAL: {
       ZoneScopedNC("GET LOCAL", tracy::Color::Pink);
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
       uint8_t slot = frame->readByte();
       stack.push_back(frame->slots[slot]);
       FrameMark;
+#ifdef BENCHMARK
+      auto t2 = std::chrono::high_resolution_clock::now();
+      /* Getting number of milliseconds as an integer. */
+      auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+      times[OP_GET_LOCAL] += ms_int.count();
+      calls[OP_GET_LOCAL]++;
+#endif
       break;
     }
     case OP_SET_LOCAL: {
