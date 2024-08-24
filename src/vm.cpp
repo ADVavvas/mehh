@@ -2,35 +2,35 @@
 #include "Tracy.hpp"
 #include "call_frame.hpp"
 #include "chunk.hpp"
-#include "common.hpp"
 #include "compiler.hpp"
-#include "debug.hpp"
 #include "function.hpp"
 #include "value.hpp"
 #include "value_array.hpp"
-#include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <stdint.h>
 #include <string>
 #include <string_view>
+#include <sys/cdefs.h>
 #include <variant>
 #include <vector>
 
-#define BENCHMARK
+// #define BENCHMARK
 
 VM::VM() noexcept : compiler(Compiler{stringIntern}) {
-  frames.reserve(STACK_MAX);
   defineNative("clock", &native);
 }
 
-inline const bool VM::isFalsey(const Value &val) {
+__attribute__((always_inline)) inline const bool
+VM::isFalsey(const Value &val) {
   return std::holds_alternative<nil>(val) ||
          (std::holds_alternative<bool>(val) && !std::get<bool>(val));
 }
 
-inline const bool VM::valuesEqual(const Value &a, const Value &b) {
+__attribute__((always_inline)) inline const bool
+VM::valuesEqual(const Value &a, const Value &b) {
   return std::visit(
       overloaded{
           [](const std::monostate a, const std::monostate b) { return true; },
@@ -44,12 +44,11 @@ inline const bool VM::valuesEqual(const Value &a, const Value &b) {
       a, b);
 }
 
-const bool VM::callValue(const Value &callee, const uint8_t argCount) {
+__attribute__((always_inline)) inline const bool
+VM::callValue(const Value &callee, const uint8_t argCount) {
   return std::visit(overloaded{
                         [this, argCount](const Closure *val) {
-                          ZoneScopedN("std::function");
                           bool res = call(val, argCount);
-                          FrameMark;
                           return res;
                         },
                         [this, argCount](const NativeFunction *val) {
@@ -72,18 +71,20 @@ const UpvalueObj VM::captureUpvalue(const StackIterator &local) {
 }
 
 const bool VM::call(const Closure *closure, const uint8_t argCount) {
-  if (argCount != closure->function->arity) {
+  if (__builtin_expect(argCount == closure->function->arity, 1)) {
+    if (__builtin_expect(frames.size() < FRAME_MAX, 1)) {
+      // (end - argCount - 1) accounts for the 0th slot
+      frames.emplace_back(closure, stack.end() - argCount - 1);
+      return true;
+    } else {
+      runtimeError("Stack overflow");
+      return false;
+    }
+  } else {
     runtimeError("Expected {} arguments but got {}.", closure->function->arity,
                  argCount);
     return false;
   }
-  if (frames.size() == FRAME_MAX) {
-    runtimeError("Stack overflow");
-    return false;
-  }
-  // (end - argCount - 1) accounts for the 0th slot
-  frames.push_back(CallFrame{closure, stack.end() - argCount - 1});
-  return true;
 }
 
 void VM::defineNative(std::string name, NativeFunction *fn) {
@@ -111,14 +112,20 @@ const InterpretResult VM::interpret(const std::string_view source) {
 const InterpretResult VM::run() {
   ZoneScopedNC("VM run", 0x00FFFF);
   CallFrame *frame = &frames.back();
-  uint32_t numInstructions = 0;
 #ifdef BENCHMARK
-  std::array<int, OP_RETURN + 1> calls{};
+  uint32_t numInstructions = 0;
+  std::array<uint32_t, OP_RETURN + 1> calls{};
   calls.fill(0);
-  std::array<uint32_t, OP_RETURN + 1> times{};
+  std::array<uint64_t, OP_RETURN + 1> times{};
   times.fill(0);
+  uint64_t loops = 0;
+  uint64_t loop_time = 0;
 #endif
   for (;;) {
+#ifdef BENCHMARK
+    auto l1 = std::chrono::high_resolution_clock::now();
+    numInstructions++;
+#endif
 #ifdef DEBUG_TRACE_EXECUTION
     std::cout << "          ";
     for (auto val : stack) {
@@ -129,9 +136,19 @@ const InterpretResult VM::run() {
     std::cout << "\n";
     disassembleInstruction(*(frame->closure->function->chunk), frame->getIp());
 #endif
-    numInstructions++;
-    uint8_t instruction;
-    switch (instruction = frame->readByte()) {
+#ifdef BENCHMARK
+    auto t1 = std::chrono::high_resolution_clock::now();
+#endif
+    uint8_t instruction = frame->readByte();
+
+#ifdef BENCHMARK
+    auto t2 = std::chrono::high_resolution_clock::now();
+    /* Getting number of milliseconds as an integer. */
+    auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+    times[OP_NIL] += ms_int.count();
+    calls[OP_NIL]++;
+#endif
+    switch (instruction) {
     case OP_RETURN: {
       ZoneScopedNC("RETURN", tracy::Color::Yellow);
       Value result = std::move(stack.back());
@@ -139,17 +156,44 @@ const InterpretResult VM::run() {
       frames.pop_back();
       if (frames.empty()) {
         stack.pop_back();
+#ifdef BENCHMARK
         std::cout << "Instructions: " << numInstructions << '\n';
         std::cout << "Stack capacity: " << stack.capacity() << '\n';
-#ifdef BENCHMARK
         std::cout << "SUB: " << calls[OP_SUBTRACT] << '\n';
         std::cout << "Time SUB: " << times[OP_SUBTRACT] << '\n';
+        std::cout << "ADD: " << calls[OP_ADD] << '\n';
+        std::cout << "Time ADD: " << times[OP_ADD] << ' '
+                  << times[OP_ADD] / calls[OP_ADD] << "ns/call" << '\n';
         std::cout << "LESS: " << calls[OP_LESS] << '\n';
-        std::cout << "Time LESS: " << times[OP_LESS] << '\n';
+        std::cout << "Time LESS: " << times[OP_LESS] << ' '
+                  << times[OP_LESS] / calls[OP_LESS] << "ns/call" << '\n';
         std::cout << "GET GLOBAL: " << calls[OP_GET_GLOBAL] << '\n';
-        std::cout << "Time GET GLOBAL: " << times[OP_GET_GLOBAL] << '\n';
+        std::cout << "Time GET GLOBAL: " << times[OP_GET_GLOBAL] << ' '
+                  << times[OP_GET_GLOBAL] / calls[OP_GET_GLOBAL] << "ns/call"
+                  << '\n';
         std::cout << "GET LOCAL: " << calls[OP_GET_LOCAL] << '\n';
-        std::cout << "Time GET LOCAL: " << times[OP_GET_LOCAL] << '\n';
+        std::cout << "Time GET LOCAL: " << times[OP_GET_LOCAL] << ' '
+                  << times[OP_GET_LOCAL] / calls[OP_GET_LOCAL] << "ns/call"
+                  << '\n';
+        std::cout << "JUMP: " << calls[OP_JUMP] << '\n';
+        std::cout << "Time JUMP: " << times[OP_JUMP] << '\n';
+        std::cout << "JUMP IF FALSE: " << calls[OP_JUMP_IF_FALSE] << '\n';
+        std::cout << "Time JUMP IF FALSE: " << times[OP_JUMP_IF_FALSE] << ' '
+                  << times[OP_JUMP_IF_FALSE] / calls[OP_JUMP_IF_FALSE]
+                  << "ns/call" << '\n';
+        std::cout << "CONSTANT: " << calls[OP_CONSTANT] << '\n';
+        std::cout << "Time CONSTANT: " << times[OP_CONSTANT] << ' '
+                  << times[OP_CONSTANT] / calls[OP_CONSTANT] << "ns/call"
+                  << '\n';
+        std::cout << "CALL: " << calls[OP_CALL] << '\n';
+        std::cout << "Time CALL: " << times[OP_CALL] << ' '
+                  << times[OP_CALL] / calls[OP_CALL] << "ns/call\n";
+        std::cout << "Fetch: " << calls[OP_NIL] << '\n';
+        std::cout << "Time Fetch: " << times[OP_NIL] << ' '
+                  << times[OP_NIL] / calls[OP_NIL] << "ns/call";
+        std::cout << "Loops: " << loops << '\n';
+        std::cout << "Time Loop: " << loop_time << ' '
+                  << loop_time / loops << "ns/call";
 #endif
         return INTERPRET_OK;
         FrameMark;
@@ -163,10 +207,20 @@ const InterpretResult VM::run() {
     }
     case OP_CONSTANT: {
       ZoneScopedNC("CONSTANT", tracy::Color::Burlywood);
-      const Value &constant = frame->readConstant();
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
+      const Value constant = frame->readConstant();
       stack.push_back(constant);
       // printValue(constant);
       // std::cout << "\n";
+#ifdef BENCHMARK
+      auto t2 = std::chrono::high_resolution_clock::now();
+      /* Getting number of milliseconds as an integer. */
+      auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+      times[OP_CONSTANT] += ms_int.count();
+      calls[OP_CONSTANT]++;
+#endif
       FrameMark;
     } break;
     case OP_NIL:
@@ -188,6 +242,9 @@ const InterpretResult VM::run() {
     } break;
     case OP_ADD: {
       ZoneScopedNC("ADD", tracy::Color::Brown);
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
       if (__builtin_expect(stack.size() >= 2, true)) {
         auto b = std::move(stack.back());
         stack.pop_back();
@@ -221,6 +278,13 @@ const InterpretResult VM::run() {
             },
             a, b);
         FrameMark;
+#ifdef BENCHMARK
+        auto t2 = std::chrono::high_resolution_clock::now();
+        /* Getting number of milliseconds as an integer. */
+        auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+        times[OP_ADD] += ms_int.count();
+        calls[OP_ADD]++;
+#endif
         if (__builtin_expect(success, true)) {
           break;
         }
@@ -241,9 +305,8 @@ const InterpretResult VM::run() {
 
         double b = std::get<double>(stack.back());
         stack.pop_back();
-        double a = std::get<double>(stack.back());
-        stack.pop_back();
-        stack.push_back(a - b);
+        double &a = std::get<double>(stack.back());
+        a -= b;
         FrameMark;
 #ifdef BENCHMARK
         auto t2 = std::chrono::high_resolution_clock::now();
@@ -259,10 +322,8 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_MULTIPLY: {
-
       auto res = binary_op([](double a, double b) constexpr { return a * b; });
       if (res == INTERPRET_RUNTIME_ERROR) {
-
         return res;
       }
     } break;
@@ -279,9 +340,9 @@ const InterpretResult VM::run() {
       break;
     }
     case OP_EQUAL: {
-      Value a = stack.back();
+      Value a = std::move(stack.back());
       stack.pop_back();
-      Value b = stack.back();
+      Value b = std::move(stack.back());
       stack.pop_back();
       stack.push_back(valuesEqual(a, b));
       break;
@@ -354,7 +415,7 @@ const InterpretResult VM::run() {
 #ifdef BENCHMARK
       auto t1 = std::chrono::high_resolution_clock::now();
 #endif
-      const Value &value = frame->readConstant();
+      const Value &value = frame->readConstantRef();
       if (std::holds_alternative<std::string_view>(value)) {
         const auto &variable = globals.find(std::get<std::string_view>(value));
         if (variable != globals.end()) {
@@ -432,16 +493,37 @@ const InterpretResult VM::run() {
     }
     case OP_JUMP_IF_FALSE: {
       ZoneScopedNC("JUMP", tracy::Color::Black);
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
       uint16_t offset = frame->readShort();
       if (isFalsey(stack.back())) {
         frame->ip() += offset;
       }
+#ifdef BENCHMARK
+      auto t2 = std::chrono::high_resolution_clock::now();
+      /* Getting number of milliseconds as an integer. */
+      auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+      times[OP_JUMP_IF_FALSE] += ms_int.count();
+      calls[OP_JUMP_IF_FALSE]++;
+#endif
       FrameMark;
       break;
     }
-    case OP_JUMP:
+    case OP_JUMP: {
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
       frame->ip() += frame->readShort();
+#ifdef BENCHMARK
+      auto t2 = std::chrono::high_resolution_clock::now();
+      /* Getting number of milliseconds as an integer. */
+      auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+      times[OP_JUMP] += ms_int.count();
+      calls[OP_JUMP]++;
+#endif
       break;
+    }
     case OP_LOOP: {
       uint16_t offset = frame->readShort();
       frame->ip() -= offset;
@@ -449,14 +531,23 @@ const InterpretResult VM::run() {
     }
     case OP_CALL: {
       ZoneScopedNC("call", tracy::Color::Orange);
+#ifdef BENCHMARK
+      auto t1 = std::chrono::high_resolution_clock::now();
+#endif
       uint8_t argCount = frame->readByte();
-      if (!callValue(stack[stack.size() - 1 - argCount], argCount)) {
-        return INTERPRET_RUNTIME_ERROR;
+      if (callValue(stack[stack.size() - 1 - argCount], argCount)) {
+        frame = &frames.back();
+#ifdef BENCHMARK
+        auto t2 = std::chrono::high_resolution_clock::now();
+        /* Getting number of milliseconds as an integer. */
+        auto ms_int = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+        times[OP_CALL] += ms_int.count();
+        calls[OP_CALL]++;
+#endif
+        break;
       }
-      frame = &frames.back();
-
+      return INTERPRET_RUNTIME_ERROR;
       FrameMark;
-      break;
     }
     case OP_CLOSURE: {
       ZoneScopedNC("closure", tracy::Color::Orange);
@@ -481,6 +572,14 @@ const InterpretResult VM::run() {
       break;
     }
     }
+
+#ifdef BENCHMARK
+    auto l2 = std::chrono::high_resolution_clock::now();
+    /* Getting number of milliseconds as an integer. */
+    auto dur = duration_cast<std::chrono::nanoseconds>(t2 - t1);
+    loop_time += ms_int.count();
+    loops++;
+#endif
   }
   FrameMark;
   return INTERPRET_COMPILE_ERROR;

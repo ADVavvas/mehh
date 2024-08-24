@@ -2,6 +2,7 @@
 
 #include "boost/container/static_vector.hpp"
 #include "boost/unordered/unordered_map.hpp"
+#include <absl/container/flat_hash_map.h>
 #include "call_frame.hpp"
 #include "chunk.hpp"
 #include "compiler.hpp"
@@ -12,10 +13,10 @@
 #include <cstdint>
 #include <fmt/core.h>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <time.h>
-#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -38,9 +39,9 @@ private:
   NativeFunction native = NativeFunction{VM::clockNative};
   boost::container::static_vector<Closure, STACK_MAX> closures;
   boost::container::static_vector<Value, STACK_MAX> stack;
-  std::vector<CallFrame> frames;
+  boost::container::static_vector<CallFrame, FRAME_MAX> frames;
   std::vector<uint8_t>::const_iterator ip;
-  boost::unordered_map<std::string_view, Value> globals;
+  absl::flat_hash_map<std::string_view, Value> globals;
   const Chunk *chunk;
   StringIntern stringIntern;
   Compiler compiler;
@@ -59,10 +60,10 @@ private:
   void defineNative(std::string name, NativeFunction *fn);
   template <typename... Args>
   void runtimeError(const std::string_view format, Args &&...args) {
-
     std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
     for (int i = frames.size() - 1; i >= 0; i--) {
-      size_t line = frames[i].closure->function->chunk->getLine(frames[i].ip());
+      // TODO: use iterator directly
+      size_t line = frames[i].closure->function->chunk->getLine(std::distance(frames[i].closure->function->chunk->code().begin(), frames[i].ip()));
       std::cout << fmt::format("[line {}] in script\n", line);
       if (frames[i].closure->function->name.empty()) {
         std::cout << "script\n";
@@ -73,7 +74,7 @@ private:
   }
 
   template <typename BinaryOperation>
-  InterpretResult binary_op(BinaryOperation &&op) {
+  __attribute__ ((always_inline)) inline InterpretResult binary_op(BinaryOperation &&op) {
     if (stack.size() < 2 ||
         !std::holds_alternative<double>(*(stack.end() - 1)) ||
         !std::holds_alternative<double>(*(stack.end() - 2))) {

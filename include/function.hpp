@@ -4,7 +4,6 @@
 #include "chunk.hpp"
 #include "function.fwd.hpp"
 #include "value.hpp"
-#include <_types/_uint8_t.h>
 #include <cstddef>
 #include <cstdint>
 #include <functional>

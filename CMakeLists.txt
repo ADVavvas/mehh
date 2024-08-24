@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5...3.21)
 project(mehh VERSION 0.1.0 LANGUAGES C CXX)
 
-set(CXXFLAGS  "-fno-rtti")
+set(CXXFLAGS  "-fno-rtti -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS "${CXXFLAGS}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -21,6 +21,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
+set(Boost_USE_MULTITHREADED OFF)
 set(BOOST_INCLUDE_LIBRARIES container unordered)
 set(BOOST_ENABLE_CMAKE ON)
 
@@ -31,6 +32,13 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(Boost)
+
+FetchContent_Declare(
+  abseil-cpp
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG        4447c7562e3bc702ade25105912dce503f0c4010 # 1.14
+)
+FetchContent_MakeAvailable(abseil-cpp)
 
 # Tracy (consider using CMake like GTest)
 # add_compile_definitions(TRACY_ENABLE)
@@ -56,7 +64,6 @@ ${MEHH_SRC_DIR}/mehh.cpp
 ${MEHH_SRC_DIR}/scanner.cpp
 ${MEHH_SRC_DIR}/value.cpp
 ${MEHH_SRC_DIR}/vm.cpp
-${MEHH_SRC_DIR}/value_array.cpp
 ${MEHH_SRC_DIR}/function.cpp
 ${MEHH_SRC_DIR}/call_frame.cpp
 )
@@ -72,7 +79,6 @@ ${MEHH_SRC_DIR}/mehh.cpp
 ${MEHH_SRC_DIR}/scanner.cpp
 ${MEHH_SRC_DIR}/value.cpp
 ${MEHH_SRC_DIR}/vm.cpp
-${MEHH_SRC_DIR}/value_array.cpp
 ${MEHH_SRC_DIR}/function.cpp
 ${MEHH_SRC_DIR}/call_frame.cpp
 )
@@ -92,6 +98,7 @@ target_link_libraries(
   fmt::fmt
   Boost::container
   Boost::unordered
+  absl::flat_hash_map
 )
 
 target_link_libraries(
@@ -100,6 +107,7 @@ target_link_libraries(
   fmt::fmt
   Boost::container
   Boost::unordered
+  absl::flat_hash_map
 )
 
 include(GoogleTest)

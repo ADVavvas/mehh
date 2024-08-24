@@ -22,10 +22,6 @@ size_t Chunk::writeConstant(const Value &value) noexcept {
   return constants.write(value);
 }
 
-const std::vector<uint8_t> &Chunk::getCode() const noexcept { return code_; }
-
-std::vector<uint8_t> &Chunk::code() noexcept { return code_; }
-
 // TODO: Debug
 const std::vector<Line> &Chunk::getLines() const noexcept { return lines; }
 
@@ -45,7 +41,5 @@ const uint8_t Chunk::getLine(size_t offset) const noexcept {
   }
   return lines[--i].line;
 }
-
-const ValueArray &Chunk::getConstants() const noexcept { return constants; }
 
 const size_t Chunk::count() const noexcept { return code_.size(); }

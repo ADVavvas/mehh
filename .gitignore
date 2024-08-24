@@ -51,3 +51,6 @@ _deps
 
 # Tracy logs
 tracy_logs/
+
+perf.data
+perf.data.old

@@ -3,6 +3,7 @@
 #include "value_array.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <sys/cdefs.h>
 #include <vector>
 
 enum OpCode : uint8_t {
@@ -46,15 +47,22 @@ public:
   // TODO: What type? Implicitly converted from size_t?
   void write(uint8_t byte, size_t line) noexcept;
   size_t writeConstant(const Value &value) noexcept;
-  [[nodiscard]] const std::vector<uint8_t> &getCode() const noexcept;
-  [[nodiscard]] std::vector<uint8_t> &code() noexcept;
+  [[nodiscard]] __attribute__((always_inline)) inline const std::vector<uint8_t> &getCode() const noexcept;
+  [[nodiscard]] __attribute__((always_inline)) inline std::vector<uint8_t> &code() noexcept;
+  [[nodiscard]] __attribute__((always_inline)) inline const ValueArray &getConstants() const noexcept;
   [[nodiscard]] const uint8_t getLine(size_t offset) const noexcept;
   [[nodiscard]] const std::vector<Line> &getLines() const noexcept;
-  [[nodiscard]] const ValueArray &getConstants() const noexcept;
   [[nodiscard]] const size_t count() const noexcept;
 
 private:
-  ValueArray constants;
   std::vector<uint8_t> code_;
+  ValueArray constants;
   std::vector<Line> lines;
 };
+
+const std::vector<uint8_t> &Chunk::getCode() const noexcept { return code_; }
+
+std::vector<uint8_t> &Chunk::code() noexcept { return code_; }
+
+const ValueArray &Chunk::getConstants() const noexcept { return constants; }
+
