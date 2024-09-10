@@ -24,6 +24,7 @@
 #define STACK_MAX 256
 
 enum InterpretResult {
+  INTERPRET_CONTINUE,
   INTERPRET_OK,
   INTERPRET_COMPILE_ERROR,
   INTERPRET_RUNTIME_ERROR
@@ -36,6 +37,7 @@ public:
   const InterpretResult run();
 
 private:
+  CallFrame *frame;
   NativeFunction native = NativeFunction{VM::clockNative};
   boost::container::static_vector<Closure, STACK_MAX> closures;
   boost::container::static_vector<Value, STACK_MAX> stack;
@@ -45,6 +47,12 @@ private:
   const Chunk *chunk;
   StringIntern stringIntern;
   Compiler compiler;
+  [[nodiscard]] InterpretResult op_return();
+  [[nodiscard]] InterpretResult op_call();
+  [[nodiscard]] InterpretResult op_add();
+  [[nodiscard]] InterpretResult op_subtract();
+  void op_constant();
+  void op_less();
 
   static Value clockNative(int argCount, Value *args) {
     return static_cast<double>(clock()) / CLOCKS_PER_SEC;

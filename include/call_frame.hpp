@@ -27,12 +27,14 @@ public:
 
 private:
   std::vector<uint8_t>::iterator code;
+  const std::vector<Value> &constants;
   size_t ip_ = 0;
 };
 
 // __attribute__((always_inline)) inline size_t &CallFrame::ip() { return ip_; }
 
-__attribute__((always_inline)) inline std::vector<uint8_t>::iterator &CallFrame::ip() {
+__attribute__((always_inline)) inline std::vector<uint8_t>::iterator &
+CallFrame::ip() {
   return code;
 }
 
@@ -40,7 +42,8 @@ __attribute__((always_inline)) inline std::vector<uint8_t>::iterator &CallFrame:
 //   return ip_;
 // }
 
-__attribute__((always_inline)) inline const std::vector<uint8_t>::const_iterator CallFrame::getIp() const {
+__attribute__((always_inline)) inline const std::vector<uint8_t>::const_iterator
+CallFrame::getIp() const {
   return code;
 }
 
@@ -60,14 +63,13 @@ __attribute__((always_inline)) inline const uint8_t CallFrame::readByte() {
 
 __attribute__((always_inline)) inline const uint16_t CallFrame::readShort() {
   code += 2;
-  return *(code-1) |
-         (*(code - 2) << 8);
+  return *(code - 1) | (*(code - 2) << 8);
 }
 
 __attribute__((always_inline)) inline const Value CallFrame::readConstant() {
-  return closure->function->chunk->getConstants().getValues()[readByte()];
+  return constants[readByte()];
 }
 __attribute__((always_inline)) inline const Value &
 CallFrame::readConstantRef() {
-  return closure->function->chunk->getConstants().getValues()[readByte()];
+  return constants[readByte()];
 }

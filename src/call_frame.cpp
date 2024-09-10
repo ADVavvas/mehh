@@ -3,4 +3,5 @@
 
 CallFrame::CallFrame(const Closure *closure, StackIterator slots)
     : closure{closure}, slots{slots},
-      code{closure->function->chunk->code().begin()} {}
+      code{closure->function->chunk->code().begin()},
+      constants{closure->function->chunk->getConstants().getValues()} {}
