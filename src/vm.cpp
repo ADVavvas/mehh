@@ -70,7 +70,6 @@ const bool VM::call(const Closure *closure, const uint8_t argCount) {
     if (__builtin_expect(frames.size() < FRAME_MAX, 1)) {
       // (end - argCount - 1) accounts for the 0th slot
       frames.emplace_back(closure, stack.end() - argCount - 1);
-      CallFrame frame{};
       return true;
     } else {
       runtimeError("Stack overflow");
