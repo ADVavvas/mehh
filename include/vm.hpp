@@ -2,13 +2,13 @@
 
 #include "boost/container/static_vector.hpp"
 #include "boost/unordered/unordered_map.hpp"
-#include <absl/container/flat_hash_map.h>
 #include "call_frame.hpp"
 #include "chunk.hpp"
 #include "compiler.hpp"
 #include "function.hpp"
 #include "string_intern.hpp"
 #include "value.hpp"
+#include <absl/container/flat_hash_map.h>
 #include <cstddef>
 #include <cstdint>
 #include <fmt/core.h>
@@ -24,7 +24,6 @@
 #define STACK_MAX 256
 
 enum InterpretResult {
-  INTERPRET_CONTINUE,
   INTERPRET_OK,
   INTERPRET_COMPILE_ERROR,
   INTERPRET_RUNTIME_ERROR
@@ -35,6 +34,7 @@ public:
   VM() noexcept;
   [[nodiscard]] const InterpretResult interpret(const std::string_view source);
   const InterpretResult run();
+  InterpretResult dispatch();
 
 private:
   CallFrame *frame;
@@ -47,12 +47,34 @@ private:
   const Chunk *chunk;
   StringIntern stringIntern;
   Compiler compiler;
-  [[nodiscard]] InterpretResult op_return();
-  [[nodiscard]] InterpretResult op_call();
-  [[nodiscard]] InterpretResult op_add();
-  [[nodiscard]] InterpretResult op_subtract();
-  void op_constant();
-  void op_less();
+  InterpretResult op_return();
+  InterpretResult op_call();
+  InterpretResult op_subtract();
+  InterpretResult op_constant();
+  InterpretResult op_less();
+  InterpretResult op_add();
+  InterpretResult op_negate();
+  InterpretResult op_nil();
+  InterpretResult op_true();
+  InterpretResult op_false();
+  InterpretResult op_multiply();
+  InterpretResult op_pop();
+  InterpretResult op_get_global();
+  InterpretResult op_set_global();
+  InterpretResult op_get_local();
+  InterpretResult op_set_local();
+  InterpretResult op_get_upvalue();
+  InterpretResult op_set_upvalue();
+  InterpretResult op_define_global();
+  InterpretResult op_equal();
+  InterpretResult op_greater();
+  InterpretResult op_divide();
+  InterpretResult op_not();
+  InterpretResult op_print();
+  InterpretResult op_jump();
+  InterpretResult op_jump_if_false();
+  InterpretResult op_loop();
+  InterpretResult op_closure();
 
   static Value clockNative(int argCount, Value *args) {
     return static_cast<double>(clock()) / CLOCKS_PER_SEC;
@@ -71,7 +93,8 @@ private:
     std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
     for (int i = frames.size() - 1; i >= 0; i--) {
       // TODO: use iterator directly
-      size_t line = frames[i].closure->function->chunk->getLine(std::distance(frames[i].closure->function->chunk->code().begin(), frames[i].ip()));
+      size_t line = frames[i].closure->function->chunk->getLine(std::distance(
+          frames[i].closure->function->chunk->code().begin(), frames[i].ip()));
       std::cout << fmt::format("[line {}] in script\n", line);
       if (frames[i].closure->function->name.empty()) {
         std::cout << "script\n";
@@ -82,7 +105,8 @@ private:
   }
 
   template <typename BinaryOperation>
-  __attribute__ ((always_inline)) inline InterpretResult binary_op(BinaryOperation &&op) {
+  __attribute__((always_inline)) inline InterpretResult
+  binary_op(BinaryOperation &&op) {
     if (stack.size() < 2 ||
         !std::holds_alternative<double>(*(stack.end() - 1)) ||
         !std::holds_alternative<double>(*(stack.end() - 2))) {

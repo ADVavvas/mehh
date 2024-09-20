@@ -1,36 +1,41 @@
-// var breakfast = "beignets";
-// var beverage = "cafe au lait";
-// breakfast = "beignets with " + beverage;
-// 
-// print breakfast;
-// 
-// {
-//   var a = "outer";
-//   {
-//     var a = "inner";
-//     var b = 10;
-//     print a;
-//     print b;
-//   }
-// 
-//   print a;
-// }
-// 
-// fun areWeHavingFunYet() {
-//   print "Yes we are";
-// }
-// 
-// print areWeHavingFunYet;
-
-fun fib(n) {
-  if (n < 2) return n;
-  return fib(n - 2) + fib(n - 1);
+//var breakfast = "beignets";
+//var beverage = "cafe au lait";
+//breakfast = "beignets with " + beverage;
+//
+//print breakfast;
+//
+//{
+//  var a = "outer";
+//  {
+//    var a = "inner";
+//    var b = 10;
+//    print a;
+//    print b;
+//  }
+//
+//  print a;
+//}
+//
+fun areWeHavingFunYet() {
+  return "Yes we are";
 }
 
-var start = clock();
-print fib(5);
-print clock() - start;
+print areWeHavingFunYet();
 
+// fun fib(n) {
+//   if (n < 2) return n;
+//   return fib(n - 2) + fib(n - 1);
+// }
+
+// fun test() {
+//   return "Two or more";
+// }
+
+// var start = clock();
+print "123";
+// print clock() - start;
+
+// 
 // fun outer() {
 //   var x = "outside";
 //   fun inner() {
@@ -39,3 +44,6 @@ print clock() - start;
 //   inner();
 // }
 // outer();
+
+
+print "Hello world";
