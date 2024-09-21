@@ -63,10 +63,12 @@ VM::callValue(const Value &callee, const uint8_t argCount) {
   }
 }
 
+__attribute__((always_inline))
 const UpvalueObj VM::captureUpvalue(const StackIterator &local) {
   return UpvalueObj{local.get_ptr()};
 }
 
+__attribute__((always_inline))
 const bool VM::call(const Closure *closure, const uint8_t argCount) {
   if (__builtin_expect(argCount == closure->function->arity, 1)) {
     if (__builtin_expect(frames.size() < FRAME_MAX, 1)) {
@@ -113,61 +115,61 @@ InterpretResult VM::dispatch() {
 
   switch (instruction) {
   case OP_RETURN:
-    return op_return();
+    MUSTTAIL return op_return();
   case OP_CONSTANT:
-    return op_constant();
+    MUSTTAIL return op_constant();
   case OP_NIL:
-    return op_nil();
+    MUSTTAIL return op_nil();
   case OP_TRUE:
-    return op_true();
+    MUSTTAIL return op_true();
   case OP_FALSE:
-    return op_false();
+    MUSTTAIL return op_false();
   case OP_NEGATE:
-    return op_negate();
+    MUSTTAIL return op_negate();
   case OP_ADD:
-    return op_add();
+    MUSTTAIL return op_add();
   case OP_SUBTRACT:
-    return op_subtract();
+    MUSTTAIL return op_subtract();
   case OP_MULTIPLY:
-    return op_multiply();
+    MUSTTAIL return op_multiply();
   case OP_DIVIDE:
-    return op_divide();
+    MUSTTAIL return op_divide();
   case OP_NOT:
-    return op_not();
+    MUSTTAIL return op_not();
   case OP_EQUAL:
-    return op_equal();
+    MUSTTAIL return op_equal();
   case OP_GREATER:
-    return op_greater();
+    MUSTTAIL return op_greater();
   case OP_LESS:
-    return op_less();
+    MUSTTAIL return op_less();
   case OP_PRINT:
-    return op_print();
+    MUSTTAIL return op_print();
   case OP_DEFINE_GLOBAL:
-    return op_define_global();
+    MUSTTAIL return op_define_global();
   case OP_GET_GLOBAL:
-    return op_get_global();
+    MUSTTAIL return op_get_global();
   case OP_SET_GLOBAL:
-    return op_set_global();
+    MUSTTAIL return op_set_global();
   case OP_GET_LOCAL:
-    return op_get_local();
+    MUSTTAIL return op_get_local();
   case OP_SET_LOCAL:
-    return op_set_local();
+    MUSTTAIL return op_set_local();
   case OP_GET_UPVALUE:
-    return op_get_upvalue();
+    MUSTTAIL return op_get_upvalue();
   case OP_SET_UPVALUE:
-    return op_set_upvalue();
+    MUSTTAIL return op_set_upvalue();
   case OP_POP:
-    return op_pop();
+    MUSTTAIL return op_pop();
   case OP_JUMP_IF_FALSE:
-    return op_jump_if_false();
+    MUSTTAIL return op_jump_if_false();
   case OP_JUMP:
-    return op_jump();
+    MUSTTAIL return op_jump();
   case OP_LOOP:
-    return op_loop();
+    MUSTTAIL return op_loop();
   case OP_CALL:
-    return op_call();
+    MUSTTAIL return op_call();
   case OP_CLOSURE:
-    return op_closure();
+    MUSTTAIL return op_closure();
   }
   return INTERPRET_COMPILE_ERROR;
 }

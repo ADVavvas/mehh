@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5...3.21)
 project(mehh VERSION 0.1.0 LANGUAGES C CXX)
 
-set(CXXFLAGS  "-fno-rtti -fno-omit-frame-pointer")
+set(CXXFLAGS  "-fno-rtti -fno-omit-frame-pointer -foptimize-sibling-calls")
 set(CMAKE_CXX_FLAGS "${CXXFLAGS}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

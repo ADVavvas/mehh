@@ -89,6 +89,7 @@ private:
 
   void defineNative(std::string name, NativeFunction *fn);
   template <typename... Args>
+  __attribute__((always_inline)) inline
   void runtimeError(const std::string_view format, Args &&...args) {
     std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
     for (int i = frames.size() - 1; i >= 0; i--) {
