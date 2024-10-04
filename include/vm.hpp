@@ -41,6 +41,7 @@ private:
   NativeFunction native = NativeFunction{VM::clockNative};
   boost::container::static_vector<Closure, STACK_MAX> closures;
   boost::container::static_vector<Value, STACK_MAX> stack;
+  boost::container::static_vector<StringObj, STACK_MAX> strings; // TODO: Temp - Fixme
   boost::container::static_vector<CallFrame, FRAME_MAX> frames;
   std::vector<uint8_t>::const_iterator ip;
   absl::flat_hash_map<std::string_view, Value> globals;
@@ -77,7 +78,7 @@ private:
   InterpretResult op_closure();
 
   static Value clockNative(int argCount, Value *args) {
-    return static_cast<double>(clock()) / CLOCKS_PER_SEC;
+    return Value{static_cast<double>(clock()) / CLOCKS_PER_SEC};
   }
 
   [[nodiscard]] inline const bool isFalsey(const Value &val);

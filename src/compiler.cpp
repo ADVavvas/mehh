@@ -212,7 +212,7 @@ void Compiler::markInitialized() noexcept {
   current->locals.back().depth = current->scopeDepth;
 }
 
-uint8_t Compiler::makeConstant(const Value &value) noexcept {
+uint8_t Compiler::makeConstant(const value_t &value) noexcept {
   size_t constant = currentChunk().writeConstant(value);
   if (constant > UINT8_MAX) {
     error("Too many constants in one chunk.");
@@ -235,7 +235,7 @@ void Compiler::emitReturn() noexcept {
   emitByte(OpCode::OP_RETURN);
 }
 
-void Compiler::emitConstant(const Value &value) noexcept {
+void Compiler::emitConstant(const value_t &value) noexcept {
   emitBytes(OpCode::OP_CONSTANT, makeConstant(value));
 }
 
@@ -292,7 +292,8 @@ Compiler::parseVariable(const std::string_view errorMessage) noexcept {
 
 const uint8_t Compiler::identifierConstant(const Token &name) noexcept {
   std::string_view interned = stringIntern.intern(parser.previous.lexeme);
-  return makeConstant(interned);
+  // TODO: This is wrong
+  return makeConstant(&interned);
 }
 
 void Compiler::defineVariable(uint8_t global) noexcept {
@@ -512,7 +513,8 @@ void Compiler::string() noexcept {
   }
   std::string_view interned = stringIntern.intern(
       parser.previous.lexeme.substr(1, parser.previous.lexeme.size() - 2));
-  emitConstant(interned);
+  // TODO: This is wrong
+  emitConstant(&interned);
 }
 
 void Compiler::variable() noexcept { namedVariable(parser.previous); }

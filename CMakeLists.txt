@@ -70,11 +70,10 @@ ${MEHH_SRC_DIR}/call_frame.cpp
 
 set (MEHH_TESTS 
 ${TRACY_SRC_DIR}/TracyClient.cpp
-${MEHH_TESTS_DIR}/test.cpp
+${MEHH_TESTS_DIR}/nanbox.cpp
 ${MEHH_SRC_DIR}/chunk.cpp
 ${MEHH_SRC_DIR}/compiler.cpp
 ${MEHH_SRC_DIR}/debug.cpp
-${MEHH_SRC_DIR}/main.cpp
 ${MEHH_SRC_DIR}/mehh.cpp
 ${MEHH_SRC_DIR}/scanner.cpp
 ${MEHH_SRC_DIR}/value.cpp

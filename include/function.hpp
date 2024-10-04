@@ -1,23 +1,21 @@
 #pragma once
 
-#include "boost/container/static_vector.hpp"
 #include "chunk.hpp"
 #include "function.fwd.hpp"
 #include "value.hpp"
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 using NativeFunctionPtr = Value (*)(int, Value *);
-class NativeFunction {
+class NativeFunction : public Obj {
 public:
+  NativeFunction(NativeFunctionPtr fun) : Obj{ValueType::NATIVE_FUNCTION}, fun{fun} {} ;
   NativeFunctionPtr fun;
 };
 
-class Function {
+class Function : public Obj {
 public:
   Function(Chunk *chunk);
 
@@ -33,9 +31,9 @@ public:
   Value *location;
 };
 
-class Closure {
+class Closure : public Obj {
 public:
-  explicit Closure(const Function *function) : function{function} {
+  explicit Closure(const Function *function) : Obj{ValueType::CLOSURE}, function{function} {
     upvalues.reserve(function->upvalueCount);
   };
   const Function *function;

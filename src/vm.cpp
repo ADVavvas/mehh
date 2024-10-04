@@ -27,8 +27,7 @@ VM::VM() noexcept : compiler(Compiler{stringIntern}) {
 
 __attribute__((always_inline)) inline const bool
 VM::isFalsey(const Value &val) {
-  return std::holds_alternative<nil>(val) ||
-         (std::holds_alternative<bool>(val) && !std::get<bool>(val));
+  return val.isNil() || (val.isBool() && !val.asBool());
 }
 
 __attribute__((always_inline)) inline const bool
@@ -48,28 +47,40 @@ VM::valuesEqual(const Value &a, const Value &b) {
 
 __attribute__((always_inline)) inline const bool
 VM::callValue(const Value &callee, const uint8_t argCount) {
-  if (std::holds_alternative<const Closure *>(callee)) {
-    bool res = call(std::get<const Closure *>(callee), argCount);
+  if (UNLIKELY(!callee.isObj())) {
+    runtimeError("Can only call functions and classes");
+    return false;
+  }
+
+  auto ptr = callee.asObj();
+
+  switch (ptr->getType()) {
+  case ValueType::CLOSURE: {
+
+    bool res = call(static_cast<const Closure *>(ptr), argCount);
     return res;
-  } else if (std::holds_alternative<const NativeFunction *>(callee)) {
-    Value result = std::get<const NativeFunction *>(callee)->fun(
+  }
+  case ValueType::NATIVE_FUNCTION: {
+    Value result = static_cast<const NativeFunction *>(ptr)->fun(
         argCount, stack.end().get_ptr() - argCount);
     stack.erase(stack.end() - argCount, stack.end());
     stack.push_back(result);
     return true;
-  } else {
+  }
+  default: {
     runtimeError("Can only call functions and classes");
     return false;
   }
+  }
 }
 
-__attribute__((always_inline))
-const UpvalueObj VM::captureUpvalue(const StackIterator &local) {
+__attribute__((always_inline)) const UpvalueObj
+VM::captureUpvalue(const StackIterator &local) {
   return UpvalueObj{local.get_ptr()};
 }
 
-__attribute__((always_inline))
-const bool VM::call(const Closure *closure, const uint8_t argCount) {
+__attribute__((always_inline)) const bool VM::call(const Closure *closure,
+                                                   const uint8_t argCount) {
   if (__builtin_expect(argCount == closure->function->arity, 1)) {
     if (__builtin_expect(frames.size() < FRAME_MAX, 1)) {
       // (end - argCount - 1) accounts for the 0th slot
@@ -96,11 +107,11 @@ const InterpretResult VM::interpret(const std::string_view source) {
     return INTERPRET_COMPILE_ERROR;
   }
   const Function *fun = function.value();
-  stack.push_back(fun);
+  stack.push_back(Value{static_cast<const Obj *>(fun)});
   // TODO: This ought to be refactored.
   // Need to be careful here, because we've mixed values, references, pointers
   // and smart pointers.
-  const Function *funPtr = std::get<const Function *>(stack.back());
+  const Function *funPtr = stack.back().asObj()->as<const Function>();
   Closure closure{funPtr};
   if (!call(&closure, 0)) {
     return InterpretResult::INTERPRET_RUNTIME_ERROR;
@@ -224,16 +235,16 @@ InterpretResult VM::op_less() {
     runtimeError("Stack underflow.");
     return INTERPRET_RUNTIME_ERROR;
   }
-  if (UNLIKELY(!std::holds_alternative<double>(*(stack.end() - 1)) &&
-               !std::holds_alternative<double>(*(stack.end() - 2)))) {
+  if (UNLIKELY(!(*(stack.end() - 1)).isNumber() &&
+               !(*(stack.end() - 2)).isNumber())) {
     runtimeError("Operands must be numbers.");
     return INTERPRET_RUNTIME_ERROR;
   }
-  double b = std::get<double>(stack.back());
+  double b = stack.back().asNumber();
   stack.pop_back();
-  double a = std::get<double>(stack.back());
+  double a = stack.back().asNumber();
   stack.pop_back();
-  stack.push_back(a < b);
+  stack.push_back(Value{a < b});
   MUSTTAIL return dispatch();
 }
 
@@ -242,39 +253,26 @@ InterpretResult VM::op_add() {
     runtimeError("Stack underflow");
     return INTERPRET_RUNTIME_ERROR;
   }
-  auto b = std::move(stack.back());
+  Value b = std::move(stack.back());
   stack.pop_back();
-  auto a = std::move(stack.back());
+  Value a = std::move(stack.back());
   stack.pop_back();
 
-  const bool success = std::visit(
-      overloaded{
-          [this](const std::monostate a, const std::monostate b) {
-            runtimeError("Operands must be two numbers or two strings.");
-            return false;
-          },
-          [this](const bool a, const bool b) {
-            runtimeError("Operands must be two numbers or two strings.");
-            return false;
-          },
-          [this](const double a, const double b) {
-            stack.push_back(a + b);
-            return true;
-          },
-          [this](const std::string_view a, const std::string_view b) {
-            std::string_view interned =
-                stringIntern.intern(std::string{a} + std::string{b});
-            stack.push_back(interned);
-            return true;
-          },
-          [this](const auto a, const auto b) {
-            runtimeError("Operands must be two numbers or two strings.");
-            return false;
-          },
-      },
-      a, b);
+  ValueType t_a = a.getType();
+  ValueType t_b = b.getType();
 
-  if (UNLIKELY(!success)) {
+  // TODO: Branch prediction
+  if (t_a == ValueType::NUMBER && t_b == ValueType::NUMBER) {
+    stack.push_back(Value{a.asNumber() + b.asNumber()});
+  } else if (t_a == ValueType::STRING && t_b == ValueType::STRING) {
+    std::string_view interned =
+        stringIntern.intern(std::string{*a.asObj()->as<std::string>()} +
+                            std::string{*b.asObj()->as<std::string>()});
+    // TODO: Fix allocations
+    strings.emplace_back(interned);
+    stack.push_back(Value{&strings.back()});
+  } else {
+    runtimeError("Operands must be two numbers or two strings.");
     return INTERPRET_RUNTIME_ERROR;
   }
 
@@ -286,39 +284,42 @@ InterpretResult VM::op_subtract() {
     runtimeError("Stack underflow");
     return INTERPRET_RUNTIME_ERROR;
   }
-  if (UNLIKELY(!std::holds_alternative<double>(*(stack.end() - 1)) ||
-               !std::holds_alternative<double>(*(stack.end() - 2)))) {
+  if (UNLIKELY(!(stack.end() - 1)->isNumber() ||
+               !(stack.end() - 2)->isNumber())) {
     runtimeError("Operands must be numbers");
     return INTERPRET_RUNTIME_ERROR;
   }
 
-  double &b = std::get<double>(stack.back());
+  // TODO: Calculate in place
+  double b = stack.back().asNumber();
   stack.pop_back();
-  double &a = std::get<double>(stack.back());
-  a -= b;
+  double a = stack.back().asNumber();
+  stack.pop_back();
+  stack.emplace_back(a - b);
   MUSTTAIL return dispatch();
 }
 
 InterpretResult VM::op_negate() {
-  Value &val = stack.back();
-  if (UNLIKELY(!std::holds_alternative<double>(val))) {
+  Value val = stack.back();
+  if (UNLIKELY(!val.isNumber())) {
     runtimeError("Operand must be a number");
     return INTERPRET_RUNTIME_ERROR;
   }
-  val = -std::get<double>(val);
+  stack.pop_back();
+  stack.emplace_back(-val.asNumber());
   MUSTTAIL return dispatch();
 }
 
 InterpretResult VM::op_nil() {
-  stack.push_back(nil{});
+  stack.push_back(Value{});
   MUSTTAIL return dispatch();
 }
 InterpretResult VM::op_true() {
-  stack.push_back(true);
+  stack.push_back(Value{true});
   MUSTTAIL return dispatch();
 }
 InterpretResult VM::op_false() {
-  stack.push_back(false);
+  stack.push_back(Value{false});
   MUSTTAIL return dispatch();
 }
 
@@ -343,8 +344,9 @@ InterpretResult VM::op_get_global() {
   auto t1 = std::chrono::high_resolution_clock::now();
 #endif
   const Value &value = frame->readConstantRef();
-  if (std::holds_alternative<std::string_view>(value)) {
-    const auto &variable = globals.find(std::get<std::string_view>(value));
+  if (std::holds_alternative<const std::string_view *>(value)) {
+    const auto &variable =
+        globals.find(*std::get<const std::string_view *>(value));
     if (variable != globals.end()) {
       stack.push_back(variable->second);
 #ifdef BENCHMARK
@@ -357,7 +359,7 @@ InterpretResult VM::op_get_global() {
       MUSTTAIL return dispatch();
     } else {
       runtimeError("Undefined variable '{}.'",
-                   std::get<std::string_view>(value));
+                   *std::get<const std::string_view *>(value));
       return INTERPRET_RUNTIME_ERROR;
     }
   }
@@ -366,12 +368,12 @@ InterpretResult VM::op_get_global() {
 
 InterpretResult VM::op_set_global() {
   const Value &name = frame->readConstant();
-  if (UNLIKELY(!std::holds_alternative<std::string_view>(name))) {
+  if (UNLIKELY(!name.isString())) {
     // TODO: Is this logic right?
     MUSTTAIL return dispatch();
   }
   const Value value = stack.back();
-  const std::string_view nameStr = std::get<std::string_view>(name);
+  const std::string_view nameStr = *std::get<const std::string_view *>(name);
   if (UNLIKELY(!globals.contains(nameStr))) {
     runtimeError("Undefined variable '{}'.", nameStr);
     return INTERPRET_RUNTIME_ERROR;
@@ -420,11 +422,11 @@ InterpretResult VM::op_set_upvalue() {
 
 InterpretResult VM::op_define_global() {
   const Value &name = frame->readConstant();
-  if (UNLIKELY(!std::holds_alternative<std::string_view>(name))) {
+  if (UNLIKELY(!std::holds_alternative<const std::string_view *>(name))) {
     MUSTTAIL return dispatch();
   }
   const Value value = stack.back();
-  const std::string_view nameStr = std::get<std::string_view>(name);
+  const std::string_view nameStr = *std::get<const std::string_view *>(name);
 
   globals.insert_or_assign(nameStr, value);
   stack.pop_back();
@@ -513,20 +515,20 @@ InterpretResult VM::op_closure() {
   // Need to be careful here, because we've mixed values, references,
   // pointers and smart pointers.
   {
-  const Function *funPtr = std::get<const Function *>(frame->readConstantRef());
-  Closure closure{funPtr};
-  for (int i = 0; i < closure.function->upvalueCount; i++) {
-    uint8_t isLocal = frame->readByte();
-    uint8_t index = frame->readByte();
-    if (isLocal) {
-      closure.upvalues.push_back(captureUpvalue(frame->slots + index));
-    } else {
-      closure.upvalues.push_back(frame->closure->upvalues[index]);
+    const Function *funPtr =
+        std::get<const Function *>(frame->readConstantRef());
+    Closure closure{funPtr};
+    for (int i = 0; i < closure.function->upvalueCount; i++) {
+      uint8_t isLocal = frame->readByte();
+      uint8_t index = frame->readByte();
+      if (isLocal) {
+        closure.upvalues.push_back(captureUpvalue(frame->slots + index));
+      } else {
+        closure.upvalues.push_back(frame->closure->upvalues[index]);
+      }
     }
-  }
-  closures.push_back(closure);
-  stack.push_back(&closures.back());
+    closures.push_back(closure);
+    stack.push_back(&closures.back());
   }
   MUSTTAIL return dispatch();
 }
-
