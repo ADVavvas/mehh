@@ -4,6 +4,7 @@
 #include <bitset>
 #include <cstdint>
 #include <iostream>
+#include <string_view>
 
 // using nil = std::monostate;
 // using Value =
@@ -11,11 +12,12 @@
 //     *,
 //                  const NativeFunction *, const Closure *>;
 //
-// template <typename... Ts> struct overloaded : Ts... {
-//   using Ts::operator()...;
-// };
-// template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-//
+
+template <typename... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
 enum class ValueType {
   NUMBER,
   BOOL,
@@ -23,6 +25,7 @@ enum class ValueType {
   FUNCTION,
   NATIVE_FUNCTION,
   CLOSURE,
+  UPVALUE,
   STRING,
   OBJ,
 };
@@ -33,18 +36,42 @@ protected:
   const ValueType type;
 
 public:
-  explicit Obj(ValueType type) : type(type) {}
+  Obj(ValueType type) : type(type) {}
   virtual ~Obj() = default;
 
   const ValueType getType() const { return type; }
 
-  template <typename T> const T *const as() const {
-    return static_cast<const T *>(this);
-  }
+  // template <typename T> const T *const as() const {
+  //   return static_cast<const T *>(this);
+  // }
+
+  template <typename T> T *const as() { return static_cast<T *>(this); }
 
   // Deleted copy operations to prevent slicing
-  Obj(const Obj &) = delete;
-  Obj &operator=(const Obj &) = delete;
+  // Obj(const Obj &) = delete;
+  // Obj &operator=(const Obj &) = delete;
+};
+
+class StringObj : public Obj {
+
+public:
+  explicit StringObj(const std::string str)
+      : Obj{ValueType::STRING}, str{str} {};
+
+  const std::string str;
+
+bool operator==(const StringObj& obj) const
+  {
+    return this->str == obj.str;
+  }
+
+  struct hash
+  {
+    size_t operator()(const StringObj& obj) const
+    {
+      return std::hash<std::string>{}(obj.str);
+    }
+  };
 };
 
 class Value {
@@ -81,14 +108,24 @@ public:
     return (_value & (quiet_nan | sign_bit)) == (quiet_nan | sign_bit);
   }
 
+  [[nodiscard]] const bool isString() const {
+    return ((_value & (quiet_nan | sign_bit)) == (quiet_nan | sign_bit)) &&
+           asObj()->getType() == ValueType::STRING;
+  }
+
+  [[nodiscard]] const bool isFunction() const {
+    return ((_value & (quiet_nan | sign_bit)) == (quiet_nan | sign_bit)) &&
+           asObj()->getType() == ValueType::FUNCTION;
+  }
+
   [[nodiscard]] const bool is(ValueType type) const {
-    auto t = getType() ;
-    if(t == type) {
+    auto t = getType();
+    if (t == type) {
       return true;
     }
 
-    if(t == ValueType::OBJ) {
-      if(t == this->asObj()->getType()) {
+    if (t == ValueType::OBJ) {
+      if (t == this->asObj()->getType()) {
         return true;
       } else {
         return false;
@@ -107,6 +144,16 @@ public:
     return reinterpret_cast<Obj *>(_value & ~(sign_bit | quiet_nan));
   };
 
+  void set(const Value& val) { _value = val._value; };
+
+  void set(double val) { _value = boxNumber(val); }
+
+  void set(bool val) { _value = boxBool(val); };
+
+  void set(Obj *val) { _value = boxObj(val); };
+
+  void set(const Obj *val) { _value = boxObj(val); };
+
   void setNumber(double val) { _value = boxNumber(val); };
 
   void setBool(bool val) { _value = boxBool(val); };
@@ -123,7 +170,7 @@ public:
       return ValueType::BOOL;
     }
     if (isObj()) {
-      return ValueType::OBJ;
+      return asObj()->getType();
     }
     return ValueType::NIL;
   }
@@ -174,13 +221,3 @@ private:
   //   return static_cast<uint64_t>(val);
   // }
 };
-
-class StringObj : public Obj {
-
-public:
-  explicit StringObj(const std::string_view& str) : Obj{ValueType::STRING}, str{str} { };
-
-  const std::string_view & str;
-
-};
-

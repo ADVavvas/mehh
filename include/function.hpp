@@ -11,13 +11,16 @@
 using NativeFunctionPtr = Value (*)(int, Value *);
 class NativeFunction : public Obj {
 public:
-  NativeFunction(NativeFunctionPtr fun) : Obj{ValueType::NATIVE_FUNCTION}, fun{fun} {} ;
+  NativeFunction(NativeFunctionPtr fun)
+      : Obj{ValueType::NATIVE_FUNCTION}, fun{fun} {};
   NativeFunctionPtr fun;
 };
 
 class Function : public Obj {
 public:
-  Function(Chunk *chunk);
+  explicit Function(Chunk *chunk)
+      : Obj(ValueType::FUNCTION), arity{0}, name{""}, upvalueCount{0},
+        chunk{chunk} {}
 
   Chunk *chunk;
   size_t upvalueCount;
@@ -26,14 +29,16 @@ public:
 };
 
 // Not to be confused with Compiler "Upvalue".
-class UpvalueObj {
+class UpvalueObj : public Obj {
 public:
-  Value *location;
+  explicit UpvalueObj(Value * const function) : Obj(ValueType::UPVALUE), location{function} {}
+  Value * const location;
 };
 
 class Closure : public Obj {
 public:
-  explicit Closure(const Function *function) : Obj{ValueType::CLOSURE}, function{function} {
+  explicit Closure(const Function *function)
+      : Obj{ValueType::CLOSURE}, function{function} {
     upvalues.reserve(function->upvalueCount);
   };
   const Function *function;

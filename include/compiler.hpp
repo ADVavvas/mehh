@@ -108,11 +108,11 @@ private:
                          const Token &token) noexcept;
   void markInitialized() noexcept;
   const ParseRule getRule(const TokenType type) const;
-  inline uint8_t makeConstant(const value_t &value) noexcept;
+  inline uint8_t makeConstant(const Value &value) noexcept;
   inline void emitByte(uint8_t byte) noexcept;
   inline void emitBytes(uint8_t byte1, uint8_t byte2) noexcept;
   inline void emitReturn() noexcept;
-  inline void emitConstant(const value_t &value) noexcept;
+  inline void emitConstant(const Value &value) noexcept;
   inline size_t emitJump(const uint8_t instruction) noexcept;
   inline void emitLoop(const size_t loopStart) noexcept;
   void parsePrecedence(const Precedence precedence) noexcept;

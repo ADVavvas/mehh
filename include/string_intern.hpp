@@ -1,5 +1,6 @@
 #pragma once
 
+#include "value.hpp"
 #include <functional>
 #include <string>
 #include <unordered_set>
@@ -19,15 +20,16 @@ struct string_hash {
 
 class StringIntern {
 private:
-  std::unordered_set<std::string, string_hash, std::equal_to<>> strings;
+  // std::unordered_set<std::string, string_hash, std::equal_to<>> strings;
+  std::unordered_set<StringObj, StringObj::hash> strings;
 
 public:
-  const std::string_view intern(const std::string_view &str) {
-    auto it = strings.find(str);
+  const StringObj* intern(const std::string &str) {
+    auto it = strings.find(StringObj{str});
     if (it != strings.end()) {
-      return *it;
+      return &*it;
     }
-    auto res = strings.emplace(std::string{str});
-    return *res.first;
+    auto res = strings.emplace(str);
+    return &*res.first;
   }
 };

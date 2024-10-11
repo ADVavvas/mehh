@@ -93,7 +93,7 @@ size_t disassembleInstruction(const Chunk &chunk, size_t offset) {
     printValue(chunk.getConstants().getValues()[constant]);
     std::cout << "\n";
     const Function *function =
-        std::get<const Function *>(chunk.getConstants().getValues()[constant]);
+        chunk.getConstants().getValues()[constant].asObj()->as<Function>();
     for (int j = 0; j < function->upvalueCount; j++) {
       int isLocal = chunk.getCode()[offset++];
       int index = chunk.getCode()[offset++];

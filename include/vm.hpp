@@ -41,7 +41,8 @@ private:
   NativeFunction native = NativeFunction{VM::clockNative};
   boost::container::static_vector<Closure, STACK_MAX> closures;
   boost::container::static_vector<Value, STACK_MAX> stack;
-  boost::container::static_vector<StringObj, STACK_MAX> strings; // TODO: Temp - Fixme
+  boost::container::static_vector<StringObj, STACK_MAX>
+      strings; // TODO: Temp - Fixme
   boost::container::static_vector<CallFrame, FRAME_MAX> frames;
   std::vector<uint8_t>::const_iterator ip;
   absl::flat_hash_map<std::string_view, Value> globals;
@@ -90,8 +91,8 @@ private:
 
   void defineNative(std::string name, NativeFunction *fn);
   template <typename... Args>
-  __attribute__((always_inline)) inline
-  void runtimeError(const std::string_view format, Args &&...args) {
+  __attribute__((always_inline)) inline void
+  runtimeError(const std::string_view format, Args &&...args) {
     std::cout << fmt::vformat(format, fmt::make_format_args(args...)) << '\n';
     for (int i = frames.size() - 1; i >= 0; i--) {
       // TODO: use iterator directly
@@ -109,17 +110,16 @@ private:
   template <typename BinaryOperation>
   __attribute__((always_inline)) inline InterpretResult
   binary_op(BinaryOperation &&op) {
-    if (stack.size() < 2 ||
-        !std::holds_alternative<double>(*(stack.end() - 1)) ||
-        !std::holds_alternative<double>(*(stack.end() - 2))) {
+    if (stack.size() < 2 || !(*(stack.end() - 1)).isNumber() ||
+        !(*(stack.end() - 2)).isNumber()) {
       runtimeError("Operands must be numbers");
       return INTERPRET_RUNTIME_ERROR;
     }
-    double b = std::get<double>(stack.back());
+    double b = stack.back().asNumber();
     stack.pop_back();
-    double a = std::get<double>(stack.back());
+    double a = stack.back().asNumber();
     stack.pop_back();
-    stack.push_back(op(a, b));
+    stack.emplace_back(op(a, b));
     return INTERPRET_OK;
   }
 };

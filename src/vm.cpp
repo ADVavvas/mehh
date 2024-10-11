@@ -32,17 +32,22 @@ VM::isFalsey(const Value &val) {
 
 __attribute__((always_inline)) inline const bool
 VM::valuesEqual(const Value &a, const Value &b) {
-  return std::visit(
-      overloaded{
-          [](const std::monostate a, const std::monostate b) { return true; },
-          [](const bool a, const bool b) { return a == b; },
-          [](const double a, const double b) { return a == b; },
-          [](const std::string_view a, const std::string_view b) {
-            return a == b;
-          },
-          [](const auto a, const auto b) { return false; },
-      },
-      a, b);
+  const auto typeA = a.getType();
+  const auto typeB = b.getType();
+
+  // TODO: Remove branches when possible
+  if (typeA == ValueType::NIL && typeB == ValueType::NIL) {
+    return true;
+  } else if (typeA == ValueType::BOOL && typeB == ValueType::BOOL) {
+    return a.asBool() == b.asBool();
+  } else if (typeA == ValueType::NUMBER && typeB == ValueType::NUMBER) {
+    return a.asNumber() == a.asNumber();
+  } else if (typeA == ValueType::STRING && typeB == ValueType::STRING) {
+    // TODO: Implement properly
+    return a.asObj()->as<StringObj>()->str == b.asObj()->as<StringObj>()->str;
+  } else {
+    return false;
+  }
 }
 
 __attribute__((always_inline)) inline const bool
@@ -98,7 +103,7 @@ __attribute__((always_inline)) const bool VM::call(const Closure *closure,
 }
 
 void VM::defineNative(std::string name, NativeFunction *fn) {
-  globals.insert_or_assign(stringIntern.intern(name), fn);
+  globals.insert_or_assign(stringIntern.intern(name)->str, Value{fn});
 }
 
 const InterpretResult VM::interpret(const std::string_view source) {
@@ -265,12 +270,11 @@ InterpretResult VM::op_add() {
   if (t_a == ValueType::NUMBER && t_b == ValueType::NUMBER) {
     stack.push_back(Value{a.asNumber() + b.asNumber()});
   } else if (t_a == ValueType::STRING && t_b == ValueType::STRING) {
-    std::string_view interned =
-        stringIntern.intern(std::string{*a.asObj()->as<std::string>()} +
-                            std::string{*b.asObj()->as<std::string>()});
+    const StringObj * const interned =
+        stringIntern.intern(std::string{a.asObj()->as<StringObj>()->str} +
+                            std::string{b.asObj()->as<StringObj>()->str});
     // TODO: Fix allocations
-    strings.emplace_back(interned);
-    stack.push_back(Value{&strings.back()});
+    stack.push_back(Value{interned});
   } else {
     runtimeError("Operands must be two numbers or two strings.");
     return INTERPRET_RUNTIME_ERROR;
@@ -344,9 +348,9 @@ InterpretResult VM::op_get_global() {
   auto t1 = std::chrono::high_resolution_clock::now();
 #endif
   const Value &value = frame->readConstantRef();
-  if (std::holds_alternative<const std::string_view *>(value)) {
+  if (value.getType() == ValueType::STRING) {
     const auto &variable =
-        globals.find(*std::get<const std::string_view *>(value));
+        globals.find(value.asObj()->as<StringObj>()->str);
     if (variable != globals.end()) {
       stack.push_back(variable->second);
 #ifdef BENCHMARK
@@ -359,7 +363,7 @@ InterpretResult VM::op_get_global() {
       MUSTTAIL return dispatch();
     } else {
       runtimeError("Undefined variable '{}.'",
-                   *std::get<const std::string_view *>(value));
+                   value.asObj()->as<StringObj>()->str);
       return INTERPRET_RUNTIME_ERROR;
     }
   }
@@ -373,12 +377,12 @@ InterpretResult VM::op_set_global() {
     MUSTTAIL return dispatch();
   }
   const Value value = stack.back();
-  const std::string_view nameStr = *std::get<const std::string_view *>(name);
+  const std::string_view nameStr = name.asObj()->as<StringObj>()->str;
   if (UNLIKELY(!globals.contains(nameStr))) {
     runtimeError("Undefined variable '{}'.", nameStr);
     return INTERPRET_RUNTIME_ERROR;
   }
-  globals[std::string{nameStr}] = value;
+  globals[nameStr] = value;
   MUSTTAIL return dispatch();
 }
 
@@ -416,17 +420,18 @@ InterpretResult VM::op_get_upvalue() {
 
 InterpretResult VM::op_set_upvalue() {
   uint8_t slot = frame->readByte();
-  *(frame->closure->upvalues[slot].location) = stack.back();
+  Value * val = frame->closure->upvalues[slot].location;
+  val->set(stack.back());
   MUSTTAIL return dispatch();
 }
 
 InterpretResult VM::op_define_global() {
   const Value &name = frame->readConstant();
-  if (UNLIKELY(!std::holds_alternative<const std::string_view *>(name))) {
+  if (UNLIKELY(!name.isString())) {
     MUSTTAIL return dispatch();
   }
   const Value value = stack.back();
-  const std::string_view nameStr = *std::get<const std::string_view *>(name);
+  const std::string_view nameStr = name.asObj()->as<StringObj>()->str;
 
   globals.insert_or_assign(nameStr, value);
   stack.pop_back();
@@ -438,7 +443,7 @@ InterpretResult VM::op_equal() {
   stack.pop_back();
   Value b = std::move(stack.back());
   stack.pop_back();
-  stack.push_back(valuesEqual(a, b));
+  stack.push_back(Value{valuesEqual(a, b)});
   MUSTTAIL return dispatch();
 }
 InterpretResult VM::op_greater() {
@@ -458,8 +463,9 @@ InterpretResult VM::op_divide() {
 }
 
 InterpretResult VM::op_not() {
+  // TODO: In place
   Value &val = stack.back();
-  val = isFalsey(val);
+  stack.emplace_back(isFalsey(val));
   MUSTTAIL return dispatch();
 }
 
@@ -516,7 +522,7 @@ InterpretResult VM::op_closure() {
   // pointers and smart pointers.
   {
     const Function *funPtr =
-        std::get<const Function *>(frame->readConstantRef());
+        frame->readConstantRef().asObj()->as<Function>();
     Closure closure{funPtr};
     for (int i = 0; i < closure.function->upvalueCount; i++) {
       uint8_t isLocal = frame->readByte();
@@ -528,7 +534,7 @@ InterpretResult VM::op_closure() {
       }
     }
     closures.push_back(closure);
-    stack.push_back(&closures.back());
+    stack.emplace_back(&closures.back());
   }
   MUSTTAIL return dispatch();
 }

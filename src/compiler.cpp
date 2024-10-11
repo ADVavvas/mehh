@@ -212,7 +212,7 @@ void Compiler::markInitialized() noexcept {
   current->locals.back().depth = current->scopeDepth;
 }
 
-uint8_t Compiler::makeConstant(const value_t &value) noexcept {
+uint8_t Compiler::makeConstant(const Value &value) noexcept {
   size_t constant = currentChunk().writeConstant(value);
   if (constant > UINT8_MAX) {
     error("Too many constants in one chunk.");
@@ -235,7 +235,7 @@ void Compiler::emitReturn() noexcept {
   emitByte(OpCode::OP_RETURN);
 }
 
-void Compiler::emitConstant(const value_t &value) noexcept {
+void Compiler::emitConstant(const Value &value) noexcept {
   emitBytes(OpCode::OP_CONSTANT, makeConstant(value));
 }
 
@@ -291,9 +291,10 @@ Compiler::parseVariable(const std::string_view errorMessage) noexcept {
 }
 
 const uint8_t Compiler::identifierConstant(const Token &name) noexcept {
-  std::string_view interned = stringIntern.intern(parser.previous.lexeme);
   // TODO: This is wrong
-  return makeConstant(&interned);
+  const StringObj *const interned = stringIntern.intern(std::string{parser.previous.lexeme});
+  // TODO: This is wrong
+  return makeConstant(Value{interned});
 }
 
 void Compiler::defineVariable(uint8_t global) noexcept {
@@ -375,7 +376,7 @@ void Compiler::createFunction(const FunctionType type) noexcept {
   block();
 
   endCompiler();
-  emitBytes(OpCode::OP_CLOSURE, makeConstant(compiler.getFunction()));
+  emitBytes(OpCode::OP_CLOSURE, makeConstant(Value{compiler.getFunction()}));
   for (int i = 0; i < compiler.getFunction()->upvalueCount; i++) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
     emitByte(compiler.upvalues[i].index);
@@ -403,7 +404,7 @@ void Compiler::expression() noexcept {
 
 void Compiler::number() noexcept {
   double value = std::stod(parser.previous.lexeme.data());
-  emitConstant(value);
+  emitConstant(Value{value});
 }
 
 void Compiler::grouping() noexcept {
@@ -511,10 +512,11 @@ void Compiler::string() noexcept {
   if (parser.previous.lexeme.size() < 2) {
     return;
   }
-  std::string_view interned = stringIntern.intern(
-      parser.previous.lexeme.substr(1, parser.previous.lexeme.size() - 2));
   // TODO: This is wrong
-  emitConstant(&interned);
+  const StringObj * interned = stringIntern.intern(
+      std::string{parser.previous.lexeme.substr(1, parser.previous.lexeme.size() - 2)});
+  // TODO: This is also wrong
+  emitConstant(Value{interned});
 }
 
 void Compiler::variable() noexcept { namedVariable(parser.previous); }
